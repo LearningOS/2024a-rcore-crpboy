@@ -1,6 +1,6 @@
 //! Types related to task management
 
-use crate::config::MAX_SYSCALL_NUM;
+use crate::{config::MAX_SYSCALL_NUM, timer::get_time_ms};
 
 use super::TaskContext;
 
@@ -16,7 +16,7 @@ pub struct TaskControlBlock {
 }
 
 /// The status of a task
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, Debug)]
 pub enum TaskStatus {
     /// uninitialized
     UnInit,
@@ -30,14 +30,14 @@ pub enum TaskStatus {
 
 /// task info in response
 #[allow(dead_code)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct TaskInfoInner {
     /// The numbers of syscall called by task
     pub syscall_times: [u32; MAX_SYSCALL_NUM],
     /// last recorded start time of the task
     pub start_time: usize,
-    /// Total running time of task
-    pub total_time: usize,
+    /// mark if it is launched
+    pub launch_flag: bool,
 }
 
 impl TaskInfoInner {
@@ -45,7 +45,14 @@ impl TaskInfoInner {
         Self {
             syscall_times: [0; MAX_SYSCALL_NUM],
             start_time: 0,
-            total_time: 0,
+            launch_flag: false,
+        }
+    }
+    pub fn get_time(&self) -> usize {
+        if !self.launch_flag {
+            0
+        } else {
+            get_time_ms() - self.start_time
         }
     }
 }

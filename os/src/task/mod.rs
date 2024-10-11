@@ -52,7 +52,8 @@ pub struct TaskManagerInner {
 
 /// Task information in response
 #[allow(dead_code)]
-pub struct TaskInfoResp {
+#[derive(Debug)]
+pub struct TaskInfo {
     /// Task status in it's life cycle
     status: TaskStatus,
     /// The numbers of syscall called by task
@@ -63,18 +64,25 @@ pub struct TaskInfoResp {
 
 impl TaskManagerInner {
     pub fn set_time_start(&mut self) {
-        let mut tar = self.tasks[self.current_task];
-        // assert!(tar.task_status == TaskStatus::Running);
-        tar.task_info.start_time = get_time_ms();
+        let tar = &mut self.tasks[self.current_task];
+        assert!(tar.task_status == TaskStatus::Running);
+        if !tar.task_info.launch_flag {
+            tar.task_info.launch_flag = true;
+            tar.task_info.start_time = get_time_ms();
+        }
     }
-    pub fn set_time_end_and_record(&self) {
-        let cur_time = get_time_ms();
-        let mut tar = self.tasks[self.current_task].task_info;
-        tar.total_time = cur_time - tar.start_time;
-    }
-    pub fn syscall_statistic(&self, syscall_id: usize) {
-        let mut tar = self.tasks[self.current_task].task_info;
+    pub fn syscall_statistic(&mut self, syscall_id: usize) {
+        let tar = &mut self.tasks[self.current_task].task_info;
         tar.syscall_times[syscall_id] += 1;
+        // if self.current_task < 7 {
+        //     log::info!(
+        //         "Syscall {} executed by task {}, {} in total",
+        //         syscall_id,
+        //         self.current_task,
+        //         tar.syscall_times[syscall_id],
+        //         // self.tasks[self.current_task].task_info,
+        //     );
+        // }
     }
 }
 
@@ -113,6 +121,7 @@ impl TaskManager {
         let task0 = &mut inner.tasks[0];
         task0.task_status = TaskStatus::Running;
         let next_task_cx_ptr = &task0.task_cx as *const TaskContext;
+        inner.set_time_start();
         drop(inner);
         let mut _unused = TaskContext::zero_init();
         // before this, we should drop local variables that must be dropped manually
@@ -149,22 +158,22 @@ impl TaskManager {
 
     /// statistic when syscall happen
     pub fn syscall_statistic(&self, syscall_id: usize) {
-        let inner = self.inner.exclusive_access();
+        let mut inner = self.inner.exclusive_access();
         inner.syscall_statistic(syscall_id);
         drop(inner);
     }
 
     /// return real task info
-    pub fn general_statistic_resp(&self) -> TaskInfoResp {
+    pub fn general_statistic_resp(&self) -> TaskInfo {
         let inner = self.inner.exclusive_access();
         let current_task = inner.current_task;
         let status = inner.tasks[current_task].task_status;
         let task_info = inner.tasks[current_task].task_info;
         drop(inner);
-        TaskInfoResp {
+        TaskInfo {
             status,
             syscall_times: task_info.syscall_times,
-            time: task_info.total_time,
+            time: task_info.get_time(),
         }
     }
 
@@ -174,7 +183,6 @@ impl TaskManager {
         if let Some(next) = self.find_next_task() {
             let mut inner = self.inner.exclusive_access();
             let current = inner.current_task;
-            inner.set_time_end_and_record();
             inner.tasks[next].task_status = TaskStatus::Running;
             inner.current_task = next;
             inner.set_time_start();
@@ -230,6 +238,10 @@ pub fn syscall_statistic(syscall_id: usize) {
     TASK_MANAGER.syscall_statistic(syscall_id)
 }
 
-pub fn general_statistic_resp() -> TaskInfoResp {
-    TASK_MANAGER.general_statistic_resp()
+pub fn general_statistic_resp() -> TaskInfo {
+    let res = TASK_MANAGER.general_statistic_resp();
+    let inner = TASK_MANAGER.inner.exclusive_access();
+    log::info!("current: {}\ntask_req: {:?}", inner.current_task, res);
+    drop(inner);
+    res
 }
