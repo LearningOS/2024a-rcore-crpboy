@@ -14,11 +14,13 @@ mod switch;
 #[allow(clippy::module_inception)]
 mod task;
 
-use crate::config::MAX_APP_NUM;
+use crate::config::{MAX_APP_NUM, MAX_SYSCALL_NUM};
 use crate::loader::{get_num_app, init_app_cx};
 use crate::sync::UPSafeCell;
+use crate::timer::get_time_ms;
 use lazy_static::*;
 use switch::__switch;
+use task::TaskInfoInner;
 pub use task::{TaskControlBlock, TaskStatus};
 
 pub use context::TaskContext;
@@ -40,11 +42,40 @@ pub struct TaskManager {
 }
 
 /// Inner of Task Manager
+#[allow(dead_code)]
 pub struct TaskManagerInner {
     /// task list
     tasks: [TaskControlBlock; MAX_APP_NUM],
     /// id of current `Running` task
     current_task: usize,
+}
+
+/// Task information in response
+#[allow(dead_code)]
+pub struct TaskInfoResp {
+    /// Task status in it's life cycle
+    status: TaskStatus,
+    /// The numbers of syscall called by task
+    syscall_times: [u32; MAX_SYSCALL_NUM],
+    /// Total running time of task
+    time: usize,
+}
+
+impl TaskManagerInner {
+    pub fn set_time_start(&mut self) {
+        let mut tar = self.tasks[self.current_task];
+        // assert!(tar.task_status == TaskStatus::Running);
+        tar.task_info.start_time = get_time_ms();
+    }
+    pub fn set_time_end_and_record(&self) {
+        let cur_time = get_time_ms();
+        let mut tar = self.tasks[self.current_task].task_info;
+        tar.total_time = cur_time - tar.start_time;
+    }
+    pub fn syscall_statistic(&self, syscall_id: usize) {
+        let mut tar = self.tasks[self.current_task].task_info;
+        tar.syscall_times[syscall_id] += 1;
+    }
 }
 
 lazy_static! {
@@ -54,6 +85,7 @@ lazy_static! {
         let mut tasks = [TaskControlBlock {
             task_cx: TaskContext::zero_init(),
             task_status: TaskStatus::UnInit,
+            task_info: TaskInfoInner::new_bare(),
         }; MAX_APP_NUM];
         for (i, task) in tasks.iter_mut().enumerate() {
             task.task_cx = TaskContext::goto_restore(init_app_cx(i));
@@ -115,14 +147,37 @@ impl TaskManager {
             .find(|id| inner.tasks[*id].task_status == TaskStatus::Ready)
     }
 
+    /// statistic when syscall happen
+    pub fn syscall_statistic(&self, syscall_id: usize) {
+        let inner = self.inner.exclusive_access();
+        inner.syscall_statistic(syscall_id);
+        drop(inner);
+    }
+
+    /// return real task info
+    pub fn general_statistic_resp(&self) -> TaskInfoResp {
+        let inner = self.inner.exclusive_access();
+        let current_task = inner.current_task;
+        let status = inner.tasks[current_task].task_status;
+        let task_info = inner.tasks[current_task].task_info;
+        drop(inner);
+        TaskInfoResp {
+            status,
+            syscall_times: task_info.syscall_times,
+            time: task_info.total_time,
+        }
+    }
+
     /// Switch current `Running` task to the task we have found,
     /// or there is no `Ready` task and we can exit with all applications completed
     fn run_next_task(&self) {
         if let Some(next) = self.find_next_task() {
             let mut inner = self.inner.exclusive_access();
             let current = inner.current_task;
+            inner.set_time_end_and_record();
             inner.tasks[next].task_status = TaskStatus::Running;
             inner.current_task = next;
+            inner.set_time_start();
             let current_task_cx_ptr = &mut inner.tasks[current].task_cx as *mut TaskContext;
             let next_task_cx_ptr = &inner.tasks[next].task_cx as *const TaskContext;
             drop(inner);
@@ -168,4 +223,13 @@ pub fn suspend_current_and_run_next() {
 pub fn exit_current_and_run_next() {
     mark_current_exited();
     run_next_task();
+}
+
+/// syscall statistic
+pub fn syscall_statistic(syscall_id: usize) {
+    TASK_MANAGER.syscall_statistic(syscall_id)
+}
+
+pub fn general_statistic_resp() -> TaskInfoResp {
+    TASK_MANAGER.general_statistic_resp()
 }
