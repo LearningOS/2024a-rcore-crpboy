@@ -247,6 +247,10 @@ impl MemorySet {
             false
         }
     }
+    /// unmap a page
+    pub fn unmap(&mut self, vpn: VirtPageNum) {
+        self.page_table.unmap(vpn);
+    }
 
     /// append the area to new_end
     #[allow(unused)]

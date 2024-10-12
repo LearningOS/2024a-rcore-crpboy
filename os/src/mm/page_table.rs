@@ -150,11 +150,12 @@ impl PageTable {
 }
 
 /// Translate&Copy a ptr[u8] array with LENGTH len to a mutable u8 Vec through page table
+/// 将从ptr开始的 长度为len的 以byte为单位的一段虚地址 映射到token对应物理页表下的地址上
 pub fn translated_byte_buffer(token: usize, ptr: *const u8, len: usize) -> Vec<&'static mut [u8]> {
-    let page_table = PageTable::from_token(token);
+    let page_table = PageTable::from_token(token); // 通过token就可以获取当前进程对应的页表
     let mut start = ptr as usize;
-    let end = start + len;
-    let mut v = Vec::new();
+    let end = start + len; // [start, end)
+    let mut v = Vec::new(); // 这个vec是创建在内核空间上,可以直接被内核访问
     while start < end {
         let start_va = VirtAddr::from(start);
         let mut vpn = start_va.floor();

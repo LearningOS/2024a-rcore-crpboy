@@ -14,8 +14,11 @@ mod switch;
 #[allow(clippy::module_inception)]
 mod task;
 
+use crate::config::MAX_SYSCALL_NUM;
 use crate::loader::{get_app_data, get_num_app};
+use crate::mm::{MapPermission, VirtPageNum};
 use crate::sync::UPSafeCell;
+use crate::timer::get_time_ms;
 use crate::trap::TrapContext;
 use alloc::vec::Vec;
 use lazy_static::*;
@@ -46,6 +49,21 @@ struct TaskManagerInner {
     tasks: Vec<TaskControlBlock>,
     /// id of current `Running` task
     current_task: usize,
+}
+
+impl TaskManagerInner {
+    pub fn set_time_start(&mut self) {
+        let tar = &mut self.tasks[self.current_task];
+        assert!(tar.task_status == TaskStatus::Running);
+        if !tar.task_info.launch_flag {
+            tar.task_info.launch_flag = true;
+            tar.task_info.start_time = get_time_ms();
+        }
+    }
+    pub fn task_info_statistic(&mut self, syscall_id: usize) {
+        let tar = &mut self.tasks[self.current_task].task_info;
+        tar.syscall_times[syscall_id] += 1;
+    }
 }
 
 lazy_static! {
@@ -80,6 +98,7 @@ impl TaskManager {
         let next_task = &mut inner.tasks[0];
         next_task.task_status = TaskStatus::Running;
         let next_task_cx_ptr = &next_task.task_cx as *const TaskContext;
+        inner.set_time_start();
         drop(inner);
         let mut _unused = TaskContext::zero_init();
         // before this, we should drop local variables that must be dropped manually
@@ -143,6 +162,7 @@ impl TaskManager {
             inner.current_task = next;
             let current_task_cx_ptr = &mut inner.tasks[current].task_cx as *mut TaskContext;
             let next_task_cx_ptr = &inner.tasks[next].task_cx as *const TaskContext;
+            inner.set_time_start();
             drop(inner);
             // before this, we should drop local variables that must be dropped manually
             unsafe {
@@ -153,6 +173,60 @@ impl TaskManager {
             panic!("All applications completed!");
         }
     }
+
+    /// statistic when syscall happen
+    pub fn task_info_statistic(&self, syscall_id: usize) {
+        let mut inner = self.inner.exclusive_access();
+        inner.task_info_statistic(syscall_id);
+        drop(inner);
+    }
+
+    /// return real task info
+    pub fn get_task_info(&self) -> TaskInfo {
+        let inner = self.inner.exclusive_access();
+        let current_task = inner.current_task;
+        let status = inner.tasks[current_task].task_status;
+        let task_info = inner.tasks[current_task].task_info;
+        drop(inner);
+        TaskInfo {
+            status,
+            syscall_times: task_info.syscall_times,
+            time: task_info.get_time(),
+        }
+    }
+
+    /// sys_mmap inner call
+    /// assume that pages in range are not assigned
+    pub fn do_mmap(&self, start: usize, size: usize, perm: MapPermission) -> bool {
+        let mut inner = self.inner.exclusive_access();
+        let end = start + size;
+        let current_task_index = inner.current_task;
+        inner.tasks[current_task_index]
+            .memory_set
+            .insert_framed_area(start.into(), end.into(), perm);
+        true
+    }
+
+    /// sys_munmap inner call
+    /// assume that pages in range are all successfully assigned
+    pub fn do_munmap(&self, vpn: VirtPageNum) -> bool {
+        let mut inner = self.inner.exclusive_access();
+        let current_task_index = inner.current_task;
+        inner.tasks[current_task_index].memory_set.unmap(vpn);
+        true
+    }
+}
+
+/// Task information
+#[allow(dead_code)]
+#[derive(Debug)]
+pub struct TaskInfo {
+    /// Task status in it's life cycle
+    pub status: TaskStatus,
+    /// The numbers of syscall called by task
+    pub syscall_times: [u32; MAX_SYSCALL_NUM],
+    /// Total running time of task
+    pub time: usize,
 }
 
 /// Run the first task in task list.
@@ -201,4 +275,30 @@ pub fn current_trap_cx() -> &'static mut TrapContext {
 /// Change the current 'Running' task's program break
 pub fn change_program_brk(size: i32) -> Option<usize> {
     TASK_MANAGER.change_current_program_brk(size)
+}
+
+/// syscall taskinfo statistic
+pub fn task_info_statistic(syscall_id: usize) {
+    TASK_MANAGER.task_info_statistic(syscall_id)
+}
+
+/// syscall mmap
+pub fn do_mmap(start: usize, size: usize, perm: MapPermission) -> bool {
+    TASK_MANAGER.do_mmap(start, size, perm)
+}
+
+/// syscall munmap
+pub fn do_munmap(vpn: VirtPageNum) -> bool {
+    TASK_MANAGER.do_munmap(vpn)
+}
+
+/// check if the virt page num exists in current task's page
+pub fn check_vpn_exists(vpn: VirtPageNum) -> bool {
+    let inner = TASK_MANAGER.inner.exclusive_access();
+    let ref task = inner.tasks[inner.current_task];
+    if let Some(pte) = task.memory_set.translate(vpn) {
+        pte.is_valid()
+    } else {
+        false
+    }
 }

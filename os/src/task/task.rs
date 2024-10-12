@@ -1,9 +1,10 @@
 //! Types related to task management
 use super::TaskContext;
-use crate::config::TRAP_CONTEXT_BASE;
+use crate::config::{MAX_SYSCALL_NUM, TRAP_CONTEXT_BASE};
 use crate::mm::{
     kernel_stack_position, MapPermission, MemorySet, PhysPageNum, VirtAddr, KERNEL_SPACE,
 };
+use crate::timer::get_time_ms;
 use crate::trap::{trap_handler, TrapContext};
 
 /// The task control block (TCB) of a task.
@@ -28,6 +29,9 @@ pub struct TaskControlBlock {
 
     /// Program break
     pub program_brk: usize,
+
+    /// Task info statistic
+    pub task_info: TaskInfoInner,
 }
 
 impl TaskControlBlock {
@@ -63,6 +67,7 @@ impl TaskControlBlock {
             base_size: user_sp,
             heap_bottom: user_sp,
             program_brk: user_sp,
+            task_info: TaskInfoInner::new_bare(),
         };
         // prepare TrapContext in user space
         let trap_cx = task_control_block.get_trap_cx();
@@ -98,7 +103,7 @@ impl TaskControlBlock {
     }
 }
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, Debug)]
 /// task status: UnInit, Ready, Running, Exited
 pub enum TaskStatus {
     /// uninitialized
@@ -109,4 +114,33 @@ pub enum TaskStatus {
     Running,
     /// exited
     Exited,
+}
+
+/// task info in response
+#[allow(dead_code)]
+#[derive(Clone, Copy, Debug)]
+pub struct TaskInfoInner {
+    /// The numbers of syscall called by task
+    pub syscall_times: [u32; MAX_SYSCALL_NUM],
+    /// last recorded start time of the task
+    pub start_time: usize,
+    /// mark if it is launched
+    pub launch_flag: bool,
+}
+
+impl TaskInfoInner {
+    pub fn new_bare() -> Self {
+        Self {
+            syscall_times: [0; MAX_SYSCALL_NUM],
+            start_time: 0,
+            launch_flag: false,
+        }
+    }
+    pub fn get_time(&self) -> usize {
+        if !self.launch_flag {
+            0
+        } else {
+            get_time_ms() - self.start_time
+        }
+    }
 }
