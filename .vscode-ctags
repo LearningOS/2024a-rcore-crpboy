@@ -1,0 +1,123 @@
+!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+!_TAG_OUTPUT_EXCMD	mixed	/number, pattern, mixed, or combineV2/
+!_TAG_OUTPUT_FILESEP	slash	/slash or backslash/
+!_TAG_OUTPUT_MODE	u-ctags	/u-ctags or e-ctags/
+!_TAG_PATTERN_LENGTH_LIMIT	96	/0 for no limit/
+!_TAG_PROC_CWD	/mnt/e/rcore/2024a-rcore-crpboy/	//
+!_TAG_PROGRAM_AUTHOR	Universal Ctags Team	//
+!_TAG_PROGRAM_NAME	Universal Ctags	/Derived from Exuberant Ctags/
+!_TAG_PROGRAM_URL	https://ctags.io/	/official site/
+!_TAG_PROGRAM_VERSION	5.9.0	//
+$(KERNEL_BIN)	os/Makefile	/^$(KERNEL_BIN): kernel$/;"	t
+APPS	ci-user/user/Makefile	/^		APPS := $(foreach T, $(TESTS), $(wildcard $(APP_DIR)\/ch$(T)*.rs))$/;"	m
+APPS	ci-user/user/Makefile	/^		APPS := $(foreach T, $(TESTS), $(wildcard $(APP_DIR)\/ch$(T)_*.rs))$/;"	m
+APPS	ci-user/user/Makefile	/^		APPS := $(foreach T, $(TESTS), $(wildcard $(APP_DIR)\/ch$(T)b_*.rs))$/;"	m
+APPS	ci-user/user/Makefile	/^	APPS :=  $(filter-out $(wildcard $(APP_DIR)\/ch*.rs), $(wildcard $(APP_DIR)\/*.rs))$/;"	m
+APPS	ci-user/user/Makefile	/^	APPS :=  $(wildcard $(APP_DIR)\/ch*.rs)$/;"	m
+APPS	user/Makefile	/^		APPS := $(foreach T, $(TESTS), $(wildcard $(APP_DIR)\/ch$(T)*.rs))$/;"	m
+APPS	user/Makefile	/^		APPS := $(foreach T, $(TESTS), $(wildcard $(APP_DIR)\/ch$(T)_*.rs))$/;"	m
+APPS	user/Makefile	/^		APPS := $(foreach T, $(TESTS), $(wildcard $(APP_DIR)\/ch$(T)b_*.rs))$/;"	m
+APPS	user/Makefile	/^	APPS :=  $(filter-out $(wildcard $(APP_DIR)\/ch*.rs), $(wildcard $(APP_DIR)\/*.rs))$/;"	m
+APPS	user/Makefile	/^	APPS :=  $(wildcard $(APP_DIR)\/ch*.rs)$/;"	m
+APP_DIR	ci-user/user/Makefile	/^APP_DIR := src\/bin$/;"	m
+APP_DIR	user/Makefile	/^APP_DIR := src\/bin$/;"	m
+BASE	ci-user/Makefile	/^	BASE := 1$/;"	m
+BASE	ci-user/Makefile	/^	BASE := 2$/;"	m
+BASE	ci-user/user/Makefile	/^BASE ?= 0$/;"	m
+BASE	os/Makefile	/^BASE ?= 1$/;"	m
+BASE	user/Makefile	/^BASE ?= 0$/;"	m
+BASE_CHAR	ci-user/Makefile	/^	BASE_CHAR := b$/;"	m
+BOARD	os/Makefile	/^BOARD := qemu$/;"	m
+BOOTLOADER	os/Makefile	/^BOOTLOADER := ..\/bootloader\/$(SBI)-$(BOARD).bin$/;"	m
+BUILD_DIR	ci-user/user/Makefile	/^BUILD_DIR := build$/;"	m
+BUILD_DIR	user/Makefile	/^BUILD_DIR := build$/;"	m
+CHAPTER	ci-user/Makefile	/^CHAPTER ?=$/;"	m
+CHAPTER	ci-user/user/Makefile	/^CHAPTER ?= 0$/;"	m
+CHAPTER	os/Makefile	/^CHAPTER ?= $(shell git rev-parse --abbrev-ref HEAD | sed -E 's\/ch([0-9])\/\\1\/')$/;"	m
+CHAPTER	user/Makefile	/^CHAPTER ?= 0$/;"	m
+CHECK_REPORTS	ci-user/Makefile	/^	CHECK_REPORTS := 1$/;"	m
+DISASM	os/Makefile	/^DISASM ?= -x$/;"	m
+DISASM_TMP	os/Makefile	/^DISASM_TMP := target\/$(TARGET)\/$(MODE)\/asm$/;"	m
+DOCKER_NAME	Makefile	/^DOCKER_NAME ?= rcore-tutorial-v3$/;"	m
+ELFS	ci-user/user/Makefile	/^ELFS := $(patsubst $(APP_DIR)\/%.rs, $(TARGET_DIR)\/%, $(APPS))$/;"	m
+ELFS	user/Makefile	/^ELFS := $(patsubst $(APP_DIR)\/%.rs, $(TARGET_DIR)\/%, $(APPS))$/;"	m
+INITPROC	ci-user/Makefile	/^	INITPROC := 1$/;"	m
+KERNEL_BIN	os/Makefile	/^KERNEL_BIN := $(KERNEL_ELF).bin$/;"	m
+KERNEL_ELF	os/Makefile	/^KERNEL_ELF := target\/$(TARGET)\/$(MODE)\/os$/;"	m
+KERNEL_ENTRY_PA	os/Makefile	/^KERNEL_ENTRY_PA := 0x80200000$/;"	m
+LAB	ci-user/Makefile	/^	LAB := 1$/;"	m
+LAB	ci-user/Makefile	/^	LAB := 2$/;"	m
+LAB	ci-user/Makefile	/^	LAB := 3$/;"	m
+LAB	ci-user/Makefile	/^	LAB := 4$/;"	m
+LAB	ci-user/Makefile	/^	LAB := 5$/;"	m
+LAB	ci-user/Makefile	/^	LAB := 6$/;"	m
+MODE	ci-user/user/Makefile	/^MODE := release$/;"	m
+MODE	os/Makefile	/^MODE := release$/;"	m
+MODE	user/Makefile	/^MODE := release$/;"	m
+MODE_ARG	ci-user/user/Makefile	/^	MODE_ARG := --release$/;"	m
+MODE_ARG	os/Makefile	/^	MODE_ARG := --release$/;"	m
+MODE_ARG	user/Makefile	/^	MODE_ARG := --release$/;"	m
+OBJCOPY	ci-user/user/Makefile	/^OBJCOPY := rust-objcopy --binary-architecture=riscv64$/;"	m
+OBJCOPY	os/Makefile	/^OBJCOPY := rust-objcopy --binary-architecture=riscv64$/;"	m
+OBJCOPY	user/Makefile	/^OBJCOPY := rust-objcopy --binary-architecture=riscv64$/;"	m
+OBJDUMP	ci-user/user/Makefile	/^OBJDUMP := rust-objdump --arch-name=riscv64$/;"	m
+OBJDUMP	os/Makefile	/^OBJDUMP := rust-objdump --arch-name=riscv64$/;"	m
+OBJDUMP	user/Makefile	/^OBJDUMP := rust-objdump --arch-name=riscv64$/;"	m
+OFFLINE	ci-user/Makefile	/^OFFLINE :=$/;"	m
+OFFLINE	os/Makefile	/^OFFLINE :=$/;"	m
+PY	ci-user/user/Makefile	/^PY := python3$/;"	m
+PY	user/Makefile	/^PY := python3$/;"	m
+RAND	ci-user/Makefile	/^RAND := $(shell awk 'BEGIN{srand();printf("%d", 65536*rand())}')$/;"	m
+REG_CLEAR	ci-user/vendor/os-vendor/riscv-0.6.0/asm.h	/^#define REG_CLEAR(/;"	d
+REG_READ	ci-user/vendor/os-vendor/riscv-0.6.0/asm.h	/^#define REG_READ(/;"	d
+REG_READ_WRITE	ci-user/vendor/os-vendor/riscv-0.6.0/asm.h	/^#define REG_READ_WRITE(/;"	d
+REG_SET	ci-user/vendor/os-vendor/riscv-0.6.0/asm.h	/^#define REG_SET(/;"	d
+REG_SET_CLEAR	ci-user/vendor/os-vendor/riscv-0.6.0/asm.h	/^#define REG_SET_CLEAR(/;"	d
+REG_WRITE	ci-user/vendor/os-vendor/riscv-0.6.0/asm.h	/^#define REG_WRITE(/;"	d
+RO	ci-user/vendor/os-vendor/riscv-0.6.0/asm.h	/^#define RO(/;"	d
+RO32	ci-user/vendor/os-vendor/riscv-0.6.0/asm.h	/^#define RO32(/;"	d
+RW	ci-user/vendor/os-vendor/riscv-0.6.0/asm.h	/^#define RW(/;"	d
+RW32	ci-user/vendor/os-vendor/riscv-0.6.0/asm.h	/^#define RW32(/;"	d
+SBI	os/Makefile	/^SBI ?= rustsbi$/;"	m
+TARGET	ci-user/user/Makefile	/^TARGET := riscv64gc-unknown-none-elf$/;"	m
+TARGET	os/Makefile	/^TARGET := riscv64gc-unknown-none-elf$/;"	m
+TARGET	user/Makefile	/^TARGET := riscv64gc-unknown-none-elf$/;"	m
+TARGET_DIR	ci-user/user/Makefile	/^TARGET_DIR := target\/$(TARGET)\/$(MODE)$/;"	m
+TARGET_DIR	user/Makefile	/^TARGET_DIR := target\/$(TARGET)\/$(MODE)$/;"	m
+TEST	ci-user/user/Makefile	/^TEST ?= $(CHAPTER)$/;"	m
+TEST	os/Makefile	/^TEST ?= $(CHAPTER)$/;"	m
+TEST	user/Makefile	/^TEST ?= $(CHAPTER)$/;"	m
+TESTS	ci-user/user/Makefile	/^	TESTS := $(shell seq $(BASE) $(TEST))$/;"	m
+TESTS	user/Makefile	/^	TESTS := $(shell seq $(BASE) $(TEST))$/;"	m
+TOKEN_SHA1	ci-user/Makefile	/^TOKEN_SHA1 := $(shell echo -n '$(passwd)' | sha1sum | xargs | awk -F' ' '{ print $$1 }')$/;"	m
+__ASM_H	ci-user/vendor/os-vendor/riscv-0.6.0/asm.h	/^#define __ASM_H$/;"	d
+all	ci-user/user/Makefile	/^all: build$/;"	t
+all	user/Makefile	/^all: build$/;"	t
+binary	ci-user/user/Makefile	/^binary:$/;"	t
+binary	user/Makefile	/^binary:$/;"	t
+build	ci-user/user/Makefile	/^build: clean pre binary$/;"	t
+build	os/Makefile	/^build: env $(KERNEL_BIN)$/;"	t
+build	user/Makefile	/^build: clean pre binary$/;"	t
+build_docker	Makefile	/^build_docker: $/;"	t
+clean	ci-user/user/Makefile	/^clean:$/;"	t
+clean	os/Makefile	/^clean:$/;"	t
+clean	user/Makefile	/^clean:$/;"	t
+debug	os/Makefile	/^debug: build$/;"	t
+disasm	ci-user/user/Makefile	/^disasm:$/;"	t
+disasm	os/Makefile	/^disasm: kernel$/;"	t
+disasm	user/Makefile	/^disasm:$/;"	t
+disasm-vim	os/Makefile	/^disasm-vim: kernel$/;"	t
+docker	Makefile	/^docker:$/;"	t
+env	ci-user/Makefile	/^env:$/;"	t
+env	os/Makefile	/^env:$/;"	t
+fmt	Makefile	/^fmt:$/;"	t
+gdbclient	os/Makefile	/^gdbclient:$/;"	t
+gdbserver	os/Makefile	/^gdbserver: build$/;"	t
+kernel	os/Makefile	/^kernel:$/;"	t
+pre	ci-user/user/Makefile	/^pre:$/;"	t
+pre	user/Makefile	/^pre:$/;"	t
+randomize	ci-user/Makefile	/^randomize:$/;"	t
+run	os/Makefile	/^run: run-inner$/;"	t
+run-inner	os/Makefile	/^run-inner: build$/;"	t
+test	ci-user/Makefile	/^test: env randomize$/;"	t
