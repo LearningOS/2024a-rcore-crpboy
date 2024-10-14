@@ -1,9 +1,10 @@
 //! Types related to task management & Functions for completely changing TCB
 use super::TaskContext;
 use super::{kstack_alloc, pid_alloc, KernelStack, PidHandle};
-use crate::config::TRAP_CONTEXT_BASE;
+use crate::config::{MAX_SYSCALL_NUM, TRAP_CONTEXT_BASE};
 use crate::mm::{MemorySet, PhysPageNum, VirtAddr, KERNEL_SPACE};
 use crate::sync::UPSafeCell;
+use crate::timer::get_time_ms;
 use crate::trap::{trap_handler, TrapContext};
 use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
@@ -68,6 +69,9 @@ pub struct TaskControlBlockInner {
 
     /// Program break
     pub program_brk: usize,
+
+    /// task info
+    pub task_info: TaskInfoInner,
 }
 
 impl TaskControlBlockInner {
@@ -118,6 +122,7 @@ impl TaskControlBlock {
                     exit_code: 0,
                     heap_bottom: user_sp,
                     program_brk: user_sp,
+                    task_info: TaskInfoInner::new(),
                 })
             },
         };
@@ -191,6 +196,7 @@ impl TaskControlBlock {
                     exit_code: 0,
                     heap_bottom: parent_inner.heap_bottom,
                     program_brk: parent_inner.program_brk,
+                    task_info: TaskInfoInner::new(),
                 })
             },
         });
@@ -232,6 +238,7 @@ impl TaskControlBlock {
                     exit_code: 0,
                     heap_bottom: user_sp,
                     program_brk: user_sp,
+                    task_info: TaskInfoInner::new(),
                 })
             },
         });
@@ -279,7 +286,7 @@ impl TaskControlBlock {
     }
 }
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, Debug)]
 /// task status: UnInit, Ready, Running, Exited
 pub enum TaskStatus {
     /// uninitialized
@@ -290,4 +297,42 @@ pub enum TaskStatus {
     Running,
     /// exited
     Zombie,
+}
+
+/// task info in response
+#[allow(dead_code)]
+#[derive(Clone, Copy, Debug)]
+pub struct TaskInfoInner {
+    /// The numbers of syscall called by task
+    pub syscall_times: [u32; MAX_SYSCALL_NUM],
+    /// last recorded start time of the task
+    pub start_time: usize,
+    /// mark if it is launched
+    pub launch_flag: bool,
+}
+
+impl TaskInfoInner {
+    pub fn new() -> Self {
+        Self {
+            syscall_times: [0; MAX_SYSCALL_NUM],
+            start_time: get_time_ms(),
+            launch_flag: false,
+        }
+    }
+    pub fn get_time(&self) -> usize {
+        if !self.launch_flag {
+            0
+        } else {
+            get_time_ms() - self.start_time
+        }
+    }
+    pub fn set_time_start(&mut self) {
+        if !self.launch_flag {
+            self.launch_flag = true;
+            self.start_time = get_time_ms();
+        }
+    }
+    pub fn task_info_statistic(&mut self, syscall_id: usize) {
+        self.syscall_times[syscall_id] += 1;
+    }
 }
