@@ -1,11 +1,14 @@
 //! Types related to task management & Functions for completely changing TCB
-use super::TaskContext;
+use super::stride::StrideBlock;
+use super::{current_task, TaskContext};
 use super::{kstack_alloc, pid_alloc, KernelStack, PidHandle};
+
 use crate::config::{MAX_SYSCALL_NUM, TRAP_CONTEXT_BASE};
 use crate::mm::{MemorySet, PhysPageNum, VirtAddr, KERNEL_SPACE};
 use crate::sync::UPSafeCell;
 use crate::timer::get_time_ms;
 use crate::trap::{trap_handler, TrapContext};
+
 use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 use core::cell::RefMut;
@@ -35,63 +38,6 @@ impl TaskControlBlock {
         let inner = self.inner_exclusive_access();
         inner.memory_set.token()
     }
-}
-
-pub struct TaskControlBlockInner {
-    /// The physical page number of the frame where the trap context is placed
-    pub trap_cx_ppn: PhysPageNum,
-
-    /// Application data can only appear in areas
-    /// where the application address space is lower than base_size
-    pub base_size: usize,
-
-    /// Save task context
-    pub task_cx: TaskContext,
-
-    /// Maintain the execution status of the current process
-    pub task_status: TaskStatus,
-
-    /// Application address space
-    pub memory_set: MemorySet,
-
-    /// Parent process of the current process.
-    /// Weak will not affect the reference count of the parent
-    pub parent: Option<Weak<TaskControlBlock>>,
-
-    /// A vector containing TCBs of all child processes of the current process
-    pub children: Vec<Arc<TaskControlBlock>>,
-
-    /// It is set when active exit or execution error occurs
-    pub exit_code: i32,
-
-    /// Heap bottom
-    pub heap_bottom: usize,
-
-    /// Program break
-    pub program_brk: usize,
-
-    /// task info
-    pub task_info: TaskInfoInner,
-}
-
-impl TaskControlBlockInner {
-    /// get the trap context
-    pub fn get_trap_cx(&self) -> &'static mut TrapContext {
-        self.trap_cx_ppn.get_mut()
-    }
-    /// get the user token
-    pub fn get_user_token(&self) -> usize {
-        self.memory_set.token()
-    }
-    fn get_status(&self) -> TaskStatus {
-        self.task_status
-    }
-    pub fn is_zombie(&self) -> bool {
-        self.get_status() == TaskStatus::Zombie
-    }
-}
-
-impl TaskControlBlock {
     /// Create a new process
     ///
     /// At present, it is only used for the creation of initproc
@@ -123,6 +69,7 @@ impl TaskControlBlock {
                     heap_bottom: user_sp,
                     program_brk: user_sp,
                     task_info: TaskInfoInner::new(),
+                    stride_block: StrideBlock::new(),
                 })
             },
         };
@@ -197,6 +144,7 @@ impl TaskControlBlock {
                     heap_bottom: parent_inner.heap_bottom,
                     program_brk: parent_inner.program_brk,
                     task_info: TaskInfoInner::new(),
+                    stride_block: StrideBlock::new(),
                 })
             },
         });
@@ -239,6 +187,7 @@ impl TaskControlBlock {
                     heap_bottom: user_sp,
                     program_brk: user_sp,
                     task_info: TaskInfoInner::new(),
+                    stride_block: StrideBlock::new(),
                 })
             },
         });
@@ -284,6 +233,80 @@ impl TaskControlBlock {
             None
         }
     }
+
+    /// get stride for proc schedule
+    pub fn get_stride(&self) -> isize {
+        self.inner_exclusive_access().stride_block.stride
+    }
+}
+
+pub struct TaskControlBlockInner {
+    /// The physical page number of the frame where the trap context is placed
+    pub trap_cx_ppn: PhysPageNum,
+
+    /// Application data can only appear in areas
+    /// where the application address space is lower than base_size
+    pub base_size: usize,
+
+    /// Save task context
+    pub task_cx: TaskContext,
+
+    /// Maintain the execution status of the current process
+    pub task_status: TaskStatus,
+
+    /// Application address space
+    pub memory_set: MemorySet,
+
+    /// Parent process of the current process.
+    /// Weak will not affect the reference count of the parent
+    pub parent: Option<Weak<TaskControlBlock>>,
+
+    /// A vector containing TCBs of all child processes of the current process
+    pub children: Vec<Arc<TaskControlBlock>>,
+
+    /// It is set when active exit or execution error occurs
+    pub exit_code: i32,
+
+    /// Heap bottom
+    pub heap_bottom: usize,
+
+    /// Program break
+    pub program_brk: usize,
+
+    /// task info
+    pub task_info: TaskInfoInner,
+
+    /// stride control block
+    pub stride_block: StrideBlock,
+}
+
+impl TaskControlBlockInner {
+    /// get the trap context
+    pub fn get_trap_cx(&self) -> &'static mut TrapContext {
+        self.trap_cx_ppn.get_mut()
+    }
+    /// get the user token
+    pub fn get_user_token(&self) -> usize {
+        self.memory_set.token()
+    }
+    fn get_status(&self) -> TaskStatus {
+        self.task_status
+    }
+    pub fn is_zombie(&self) -> bool {
+        self.get_status() == TaskStatus::Zombie
+    }
+    pub fn update_stride(&mut self) {
+        self.stride_block.stride += self.stride_block.pass
+    }
+}
+
+/// set a new priority for task
+pub fn set_new_prio(new_prio: isize) {
+    current_task()
+        .unwrap()
+        .inner_exclusive_access()
+        .stride_block
+        .set_new_prio(new_prio);
 }
 
 #[derive(Copy, Clone, PartialEq, Debug)]

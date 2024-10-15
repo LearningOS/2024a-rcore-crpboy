@@ -17,6 +17,7 @@ mod context;
 mod id;
 mod manager;
 mod processor;
+mod stride;
 mod switch;
 #[allow(clippy::module_inception)]
 mod task;
@@ -26,7 +27,7 @@ use alloc::sync::Arc;
 use lazy_static::*;
 pub use manager::{fetch_task, TaskManager};
 use switch::__switch;
-pub use task::{TaskControlBlock, TaskStatus};
+pub use task::{set_new_prio, TaskControlBlock, TaskStatus};
 
 pub use context::TaskContext;
 pub use id::{kstack_alloc, pid_alloc, KernelStack, PidHandle};
@@ -35,6 +36,7 @@ pub use processor::{
     check_vpn_exists, current_task, current_trap_cx, current_user_token, do_mmap, do_munmap,
     get_task_info, run_tasks, schedule, take_current_task, task_info_statistic, Processor,
 };
+
 /// Suspend the current 'Running' task and run the next task in task list.
 pub fn suspend_current_and_run_next() {
     // There must be an application running.

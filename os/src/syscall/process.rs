@@ -10,7 +10,8 @@ use crate::{
     },
     task::{
         add_task, check_vpn_exists, current_task, current_user_token, do_mmap, do_munmap,
-        exit_current_and_run_next, get_task_info, suspend_current_and_run_next, TaskStatus,
+        exit_current_and_run_next, get_task_info, set_new_prio, suspend_current_and_run_next,
+        TaskStatus,
     },
     timer::get_time_us,
 };
@@ -249,6 +250,7 @@ pub fn sys_set_priority(prio: isize) -> isize {
         current_task().unwrap().pid.0
     );
     if prio >= 2 {
+        set_new_prio(prio);
         prio
     } else {
         -1
