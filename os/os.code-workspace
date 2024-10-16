@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../easy-fs"
+		},
+		{
+			"path": "../easy-fs-fuse"
+		}
+	],
+	"settings": {}
+}

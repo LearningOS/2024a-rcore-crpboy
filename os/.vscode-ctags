@@ -1,0 +1,44 @@
+!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+!_TAG_OUTPUT_EXCMD	mixed	/number, pattern, mixed, or combineV2/
+!_TAG_OUTPUT_FILESEP	slash	/slash or backslash/
+!_TAG_OUTPUT_MODE	u-ctags	/u-ctags or e-ctags/
+!_TAG_PATTERN_LENGTH_LIMIT	96	/0 for no limit/
+!_TAG_PROC_CWD	/home/crpboy/os/2024a-rcore-crpboy/os/	//
+!_TAG_PROGRAM_AUTHOR	Universal Ctags Team	//
+!_TAG_PROGRAM_NAME	Universal Ctags	/Derived from Exuberant Ctags/
+!_TAG_PROGRAM_URL	https://ctags.io/	/official site/
+!_TAG_PROGRAM_VERSION	5.9.0	//
+$(KERNEL_BIN)	Makefile	/^$(KERNEL_BIN): kernel$/;"	t
+APPS	Makefile	/^APPS := ..\/user\/src\/bin\/*$/;"	m
+BASE	Makefile	/^BASE ?= 1$/;"	m
+BOARD	Makefile	/^BOARD := qemu$/;"	m
+BOOTLOADER	Makefile	/^BOOTLOADER := ..\/bootloader\/$(SBI)-$(BOARD).bin$/;"	m
+CHAPTER	Makefile	/^CHAPTER ?= $(shell git rev-parse --abbrev-ref HEAD | sed -E 's\/ch([0-9])\/\\1\/')$/;"	m
+DISASM	Makefile	/^DISASM ?= -x$/;"	m
+DISASM_TMP	Makefile	/^DISASM_TMP := target\/$(TARGET)\/$(MODE)\/asm$/;"	m
+FS_IMG	Makefile	/^FS_IMG := ..\/user\/target\/$(TARGET)\/$(MODE)\/fs.img$/;"	m
+KERNEL_BIN	Makefile	/^KERNEL_BIN := $(KERNEL_ELF).bin$/;"	m
+KERNEL_ELF	Makefile	/^KERNEL_ELF := target\/$(TARGET)\/$(MODE)\/os$/;"	m
+KERNEL_ENTRY_PA	Makefile	/^KERNEL_ENTRY_PA := 0x80200000$/;"	m
+MODE	Makefile	/^MODE := release$/;"	m
+MODE_ARG	Makefile	/^	MODE_ARG := --release$/;"	m
+OBJCOPY	Makefile	/^OBJCOPY := rust-objcopy --binary-architecture=riscv64$/;"	m
+OBJDUMP	Makefile	/^OBJDUMP := rust-objdump --arch-name=riscv64$/;"	m
+OFFLINE	Makefile	/^OFFLINE :=$/;"	m
+SBI	Makefile	/^SBI ?= rustsbi$/;"	m
+TARGET	Makefile	/^TARGET := riscv64gc-unknown-none-elf$/;"	m
+TEST	Makefile	/^TEST ?= $(CHAPTER)$/;"	m
+TEST	Makefile	/^TEST ?=$/;"	m
+build	Makefile	/^build: env $(KERNEL_BIN) fs-img $/;"	t
+clean	Makefile	/^clean:$/;"	t
+debug	Makefile	/^debug: build$/;"	t
+disasm	Makefile	/^disasm: kernel$/;"	t
+disasm-vim	Makefile	/^disasm-vim: kernel$/;"	t
+env	Makefile	/^env:$/;"	t
+fs-img	Makefile	/^fs-img: $(APPS)$/;"	t
+gdbclient	Makefile	/^gdbclient:$/;"	t
+gdbserver	Makefile	/^gdbserver: build$/;"	t
+kernel	Makefile	/^kernel:$/;"	t
+run	Makefile	/^run: build run-inner$/;"	t
+run-inner	Makefile	/^run-inner:$/;"	t
