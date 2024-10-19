@@ -1,10 +1,12 @@
 //! Types related to task management & Functions for completely changing TCB
+use super::stride::StrideBlock;
 use super::TaskContext;
 use super::{kstack_alloc, pid_alloc, KernelStack, PidHandle};
-use crate::config::TRAP_CONTEXT_BASE;
+use crate::config::{MAX_SYSCALL_NUM, TRAP_CONTEXT_BASE};
 use crate::fs::{File, Stdin, Stdout};
 use crate::mm::{MemorySet, PhysPageNum, VirtAddr, KERNEL_SPACE};
 use crate::sync::UPSafeCell;
+use crate::timer::get_time_ms;
 use crate::trap::{trap_handler, TrapContext};
 use alloc::sync::{Arc, Weak};
 use alloc::vec;
@@ -64,7 +66,7 @@ pub struct TaskControlBlockInner {
 
     /// It is set when active exit or execution error occurs
     pub exit_code: i32,
-    
+
     /// File descriptor table
     pub fd_table: Vec<Option<Arc<dyn File + Send + Sync>>>,
 
@@ -143,6 +145,8 @@ impl TaskControlBlock {
                     ],
                     heap_bottom: user_sp,
                     program_brk: user_sp,
+                    task_info: TaskInfoInner::new(),
+                    stride_block: StrideBlock::new(),
                 })
             },
         };
@@ -224,6 +228,8 @@ impl TaskControlBlock {
                     fd_table: new_fd_table,
                     heap_bottom: parent_inner.heap_bottom,
                     program_brk: parent_inner.program_brk,
+                    task_info: TaskInfoInner::new(),
+                    stride_block: StrideBlock::new(),
                 })
             },
         });
@@ -237,6 +243,57 @@ impl TaskControlBlock {
         task_control_block
         // **** release child PCB
         // ---- release parent PCB
+    }
+
+    /// spawn a new task from elf
+    pub fn spawn(self: &Arc<Self>, elf_data: &[u8]) -> Arc<Self> {
+        let mut parent_inner = self.inner_exclusive_access();
+        let (memory_set, user_sp, entry_point) = MemorySet::from_elf(elf_data);
+        let trap_cx_ppn = memory_set
+            .translate(VirtAddr::from(TRAP_CONTEXT_BASE).into())
+            .unwrap()
+            .ppn();
+        let pid_handle = pid_alloc();
+        let kernel_stack = kstack_alloc();
+        let kernel_stack_top = kernel_stack.get_top();
+        let task_control_block = Arc::new(TaskControlBlock {
+            pid: pid_handle,
+            kernel_stack,
+            inner: unsafe {
+                UPSafeCell::new(TaskControlBlockInner {
+                    trap_cx_ppn,
+                    base_size: user_sp,
+                    task_cx: TaskContext::goto_trap_return(kernel_stack_top),
+                    task_status: TaskStatus::Ready,
+                    memory_set,
+                    parent: Some(Arc::downgrade(self)),
+                    children: Vec::new(),
+                    exit_code: 0,
+                    fd_table: vec![
+                        // 0 -> stdin
+                        Some(Arc::new(Stdin)),
+                        // 1 -> stdout
+                        Some(Arc::new(Stdout)),
+                        // 2 -> stderr
+                        Some(Arc::new(Stdout)),
+                    ],
+                    heap_bottom: user_sp,
+                    program_brk: user_sp,
+                    task_info: TaskInfoInner::new(),
+                    stride_block: StrideBlock::new(),
+                })
+            },
+        });
+        parent_inner.children.push(task_control_block.clone());
+        let trap_cx = task_control_block.inner_exclusive_access().get_trap_cx();
+        *trap_cx = TrapContext::app_init_context(
+            entry_point,
+            user_sp,
+            KERNEL_SPACE.exclusive_access().token(),
+            kernel_stack_top,
+            trap_handler as usize,
+        );
+        task_control_block
     }
 
     /// get pid of process
@@ -282,4 +339,42 @@ pub enum TaskStatus {
     Running,
     /// exited
     Zombie,
+}
+
+/// task info in response
+#[allow(dead_code)]
+#[derive(Clone, Copy, Debug)]
+pub struct TaskInfoInner {
+    /// The numbers of syscall called by task
+    pub syscall_times: [u32; MAX_SYSCALL_NUM],
+    /// last recorded start time of the task
+    pub start_time: usize,
+    /// mark if it is launched
+    pub launch_flag: bool,
+}
+
+impl TaskInfoInner {
+    pub fn new() -> Self {
+        Self {
+            syscall_times: [0; MAX_SYSCALL_NUM],
+            start_time: get_time_ms(),
+            launch_flag: false,
+        }
+    }
+    pub fn get_time(&self) -> usize {
+        if !self.launch_flag {
+            0
+        } else {
+            get_time_ms() - self.start_time
+        }
+    }
+    pub fn set_time_start(&mut self) {
+        if !self.launch_flag {
+            self.launch_flag = true;
+            self.start_time = get_time_ms();
+        }
+    }
+    pub fn task_info_statistic(&mut self, syscall_id: usize) {
+        self.syscall_times[syscall_id] += 1;
+    }
 }

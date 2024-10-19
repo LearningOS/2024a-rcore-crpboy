@@ -1,18 +1,19 @@
 //! Process management syscalls
 //!
-use alloc::sync::Arc;
-use riscv::addr::VirtAddr;
-
 use crate::{
-    config::MAX_SYSCALL_NUM,
+    config::{MAX_SYSCALL_NUM, PAGE_SIZE},
     fs::{open_file, OpenFlags},
-    mm::{translated_byte_buffer, translated_refmut, translated_str, MapPermission, VPNRange, VirtPageNum},
+    mm::{
+        translated_byte_buffer, translated_refmut, translated_str, MapPermission, VPNRange,
+        VirtAddr, VirtPageNum,
+    },
     task::{
-        add_task, current_task, current_user_token, exit_current_and_run_next,
-        suspend_current_and_run_next, TaskStatus,
+        add_task, check_vpn_exists, current_task, current_user_token, do_mmap, do_munmap,
+        exit_current_and_run_next, get_task_info, suspend_current_and_run_next, TaskStatus,
     },
     timer::get_time_us,
 };
+use alloc::sync::Arc;
 
 #[repr(C)]
 #[derive(Debug)]
@@ -25,11 +26,11 @@ pub struct TimeVal {
 #[allow(dead_code)]
 pub struct TaskInfo {
     /// Task status in it's life cycle
-    status: TaskStatus,
+    pub status: TaskStatus,
     /// The numbers of syscall called by task
-    syscall_times: [u32; MAX_SYSCALL_NUM],
+    pub syscall_times: [u32; MAX_SYSCALL_NUM],
     /// Total running time of task
-    time: usize,
+    pub time: usize,
 }
 
 pub fn sys_exit(exit_code: i32) -> ! {
