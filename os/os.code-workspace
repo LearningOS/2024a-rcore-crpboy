@@ -8,6 +8,9 @@
 		},
 		{
 			"path": "../easy-fs-fuse"
+		},
+		{
+			"path": "../tmp"
 		}
 	],
 	"settings": {}
