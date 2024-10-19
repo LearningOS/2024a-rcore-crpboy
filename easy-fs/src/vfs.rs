@@ -1,3 +1,5 @@
+use crate::BLOCK_SZ;
+
 use super::{
     block_cache_sync_all, get_block_cache, BlockDevice, DirEntry, DiskInode, DiskInodeType,
     EasyFileSystem, DIRENT_SZ,
@@ -183,5 +185,15 @@ impl Inode {
             }
         });
         block_cache_sync_all();
+    }
+    /// get inode id
+    pub fn get_inode_id(&self) -> usize {
+        let inode_size = core::mem::size_of::<DiskInode>();
+        let inodes_per_block = BLOCK_SZ / inode_size;
+        inodes_per_block * self.block_id + self.block_offset
+    }
+    /// get inode type
+    pub fn get_type(&self) -> DiskInodeType {
+        self.read_disk_inode(|inode| inode.get_type())
     }
 }

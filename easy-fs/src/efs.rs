@@ -77,7 +77,6 @@ impl EasyFileSystem {
         assert_eq!(efs.alloc_inode(), 0);
         // 获得root_inode的位置
         let (root_inode_block_id, root_inode_offset) = efs.get_disk_inode_pos(0);
-        // 
         get_block_cache(root_inode_block_id as usize, Arc::clone(&block_device))
             .lock()
             .modify(root_inode_offset, |disk_inode: &mut DiskInode| {

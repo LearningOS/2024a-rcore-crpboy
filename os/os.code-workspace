@@ -11,6 +11,9 @@
 		},
 		{
 			"path": "../tmp"
+		},
+		{
+			"path": "../reports"
 		}
 	],
 	"settings": {}

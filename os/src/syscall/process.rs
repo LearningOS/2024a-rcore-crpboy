@@ -120,7 +120,7 @@ pub fn sys_waitpid(pid: isize, exit_code_ptr: *mut i32) -> isize {
 
 /// when using ptr in user space, should copy it from kernel space
 /// this func will be called in any syscall with ptr returned
-fn copy_from_kernel_space<T>(tar_ptr: *mut T, res: &T) {
+pub fn copy_from_kernel_space<T>(tar_ptr: *mut T, res: &T) {
     let tar = translated_byte_buffer(
         current_user_token(),
         tar_ptr as *const u8,
