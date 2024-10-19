@@ -7,7 +7,9 @@
 use super::__switch;
 use super::{fetch_task, TaskStatus};
 use super::{TaskContext, TaskControlBlock};
+use crate::mm::{MapPermission, VirtPageNum};
 use crate::sync::UPSafeCell;
+use crate::syscall::TaskInfo;
 use crate::trap::TrapContext;
 use alloc::sync::Arc;
 use lazy_static::*;
@@ -43,6 +45,43 @@ impl Processor {
     ///Get current task in cloning semanteme
     pub fn current(&self) -> Option<Arc<TaskControlBlock>> {
         self.current.as_ref().map(Arc::clone)
+    }
+
+    /// return real task info
+    pub fn get_task_info(&self) -> TaskInfo {
+        let current = self.current.as_ref().map(Arc::clone).unwrap();
+        let inner = current.inner_exclusive_access();
+        let status = inner.task_status;
+        let task_info = inner.task_info;
+        drop(inner);
+        TaskInfo {
+            status,
+            syscall_times: task_info.syscall_times,
+            time: task_info.get_time(),
+        }
+    }
+
+    /// sys_mmap inner call
+    /// assume that pages in range are not assigned
+    pub fn do_mmap(&self, start: usize, size: usize, perm: MapPermission) -> bool {
+        let end = start + size;
+        self.current()
+            .unwrap()
+            .inner_exclusive_access()
+            .memory_set
+            .insert_framed_area(start.into(), end.into(), perm);
+        true
+    }
+
+    /// sys_munmap inner call
+    /// assume that pages in range are all successfully assigned
+    pub fn do_munmap(&self, vpn: VirtPageNum) -> bool {
+        self.current()
+            .unwrap()
+            .inner_exclusive_access()
+            .memory_set
+            .unmap(vpn);
+        true
     }
 }
 
@@ -108,4 +147,46 @@ pub fn schedule(switched_task_cx_ptr: *mut TaskContext) {
     unsafe {
         __switch(switched_task_cx_ptr, idle_task_cx_ptr);
     }
+}
+
+/// check if the virt page num exists in current task's page
+pub fn check_vpn_exists(vpn: VirtPageNum) -> bool {
+    if let Some(pte) = PROCESSOR
+        .exclusive_access()
+        .current()
+        .unwrap()
+        .inner_exclusive_access()
+        .memory_set
+        .translate(vpn)
+    {
+        pte.is_valid()
+    } else {
+        false
+    }
+}
+
+/// syscall taskinfo statistic
+pub fn task_info_statistic(syscall_id: usize) {
+    PROCESSOR
+        .exclusive_access()
+        .current()
+        .unwrap()
+        .inner_exclusive_access()
+        .task_info
+        .task_info_statistic(syscall_id)
+}
+
+/// task info call
+pub fn get_task_info() -> TaskInfo {
+    PROCESSOR.exclusive_access().get_task_info()
+}
+
+/// syscall mmap
+pub fn do_mmap(start: usize, size: usize, perm: MapPermission) -> bool {
+    PROCESSOR.exclusive_access().do_mmap(start, size, perm)
+}
+
+/// syscall munmap
+pub fn do_munmap(vpn: VirtPageNum) -> bool {
+    PROCESSOR.exclusive_access().do_munmap(vpn)
 }

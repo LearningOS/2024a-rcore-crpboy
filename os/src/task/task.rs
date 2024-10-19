@@ -73,6 +73,12 @@ pub struct TaskControlBlockInner {
 
     /// Program break
     pub program_brk: usize,
+
+    /// task info
+    pub task_info: TaskInfoInner,
+
+    /// stride control block
+    pub stride_block: StrideBlock,
 }
 
 impl TaskControlBlockInner {

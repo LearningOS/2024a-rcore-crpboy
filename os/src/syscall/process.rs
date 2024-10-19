@@ -1,15 +1,17 @@
 //! Process management syscalls
 //!
 use alloc::sync::Arc;
+use riscv::addr::VirtAddr;
 
 use crate::{
     config::MAX_SYSCALL_NUM,
     fs::{open_file, OpenFlags},
-    mm::{translated_refmut, translated_str},
+    mm::{translated_byte_buffer, translated_refmut, translated_str, MapPermission, VPNRange, VirtPageNum},
     task::{
         add_task, current_task, current_user_token, exit_current_and_run_next,
         suspend_current_and_run_next, TaskStatus,
     },
+    timer::get_time_us,
 };
 
 #[repr(C)]
@@ -114,46 +116,98 @@ pub fn sys_waitpid(pid: isize, exit_code_ptr: *mut i32) -> isize {
     // ---- release current PCB automatically
 }
 
+/// when using ptr in user space, should copy it from kernel space
+/// this func will be called in any syscall with ptr returned
+fn copy_from_kernel_space<T>(tar_ptr: *mut T, res: &T) {
+    let tar = translated_byte_buffer(
+        current_user_token(),
+        tar_ptr as *const u8,
+        core::mem::size_of::<T>(),
+    );
+    let mut res_ptr = res as *const T;
+    for dst in tar.into_iter() {
+        unsafe {
+            dst.copy_from_slice(core::slice::from_raw_parts(res_ptr as *const u8, dst.len()));
+            res_ptr = res_ptr.add(dst.len());
+        }
+    }
+}
+
 /// YOUR JOB: get time with second and microsecond
 /// HINT: You might reimplement it with virtual memory management.
 /// HINT: What if [`TimeVal`] is splitted by two pages ?
-pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
-    trace!(
-        "kernel:pid[{}] sys_get_time NOT IMPLEMENTED",
-        current_task().unwrap().pid.0
-    );
-    -1
+pub fn sys_get_time(ts: *mut TimeVal, _tz: usize) -> isize {
+    trace!("kernel:pid[{}] sys_get_time", current_task().unwrap().pid.0);
+    let time_us = get_time_us();
+    let res = TimeVal {
+        sec: time_us / 1_000_000,
+        usec: time_us % 1_000_000,
+    };
+    copy_from_kernel_space(ts, &res);
+    0
 }
 
 /// YOUR JOB: Finish sys_task_info to pass testcases
 /// HINT: You might reimplement it with virtual memory management.
 /// HINT: What if [`TaskInfo`] is splitted by two pages ?
-pub fn sys_task_info(_ti: *mut TaskInfo) -> isize {
+pub fn sys_task_info(ti: *mut TaskInfo) -> isize {
     trace!(
-        "kernel:pid[{}] sys_task_info NOT IMPLEMENTED",
+        "kernel:pid[{}] sys_task_info",
         current_task().unwrap().pid.0
     );
-    -1
+    let res = get_task_info();
+    // info!("task_req: {:?}\nday: {:?}", res, res.syscall_times[169]);
+    copy_from_kernel_space(ti, &res);
+    0
 }
 
-/// YOUR JOB: Implement mmap.
-pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
-    trace!(
-        "kernel:pid[{}] sys_mmap NOT IMPLEMENTED",
-        current_task().unwrap().pid.0
-    );
-    -1
+// YOUR JOB: Implement mmap.
+pub fn sys_mmap(start: usize, len: usize, _port: usize) -> isize {
+    trace!("kernel:pid[{}] sys_mmap", current_task().unwrap().pid.0);
+    // basic check
+    if start % PAGE_SIZE != 0 || (_port & !0x7) != 0 || _port & 0x7 == 0 {
+        return -1;
+    }
+    // check if pages already exists
+    let end = start + len;
+    let s_vpn: VirtPageNum = VirtAddr::from(start).floor().into();
+    let e_vpn: VirtPageNum = VirtAddr::from(end).ceil().into();
+    for cur_vpn in VPNRange::new(s_vpn, e_vpn) {
+        info!("range: {start} to {end}, cur_vpn: {:?}", cur_vpn);
+        if check_vpn_exists(cur_vpn) {
+            return -1;
+        }
+    }
+    // insert page map
+    let perm = MapPermission::from_bits_truncate((_port << 1) as u8) | MapPermission::U;
+    // info!("{:?} {:?}", _port, perm);
+    if !do_mmap(start, len, perm) {
+        return -1;
+    }
+    0
 }
 
-/// YOUR JOB: Implement munmap.
-pub fn sys_munmap(_start: usize, _len: usize) -> isize {
-    trace!(
-        "kernel:pid[{}] sys_munmap NOT IMPLEMENTED",
-        current_task().unwrap().pid.0
-    );
-    -1
+// YOUR JOB: Implement munmap.
+pub fn sys_munmap(start: usize, len: usize) -> isize {
+    trace!("kernel:pid[{}] sys_munmap", current_task().unwrap().pid.0);
+    // basic check
+    if start % PAGE_SIZE != 0 {
+        return -1;
+    }
+    // check if pages already exists
+    let end = start + len;
+    let s_vpn: VirtPageNum = VirtAddr::from(start).floor().into();
+    let e_vpn: VirtPageNum = VirtAddr::from(end).ceil().into();
+    for cur_vpn in VPNRange::new(s_vpn, e_vpn) {
+        info!("range: {:X} to {:X}, cur_vpn: {:?}", start, end, cur_vpn);
+        if !check_vpn_exists(cur_vpn) {
+            return -1;
+        } else {
+            do_munmap(cur_vpn);
+        }
+    }
+    0
 }
-
 /// change data segment size
 pub fn sys_sbrk(size: i32) -> isize {
     trace!("kernel:pid[{}] sys_sbrk", current_task().unwrap().pid.0);
@@ -166,19 +220,32 @@ pub fn sys_sbrk(size: i32) -> isize {
 
 /// YOUR JOB: Implement spawn.
 /// HINT: fork + exec =/= spawn
-pub fn sys_spawn(_path: *const u8) -> isize {
-    trace!(
-        "kernel:pid[{}] sys_spawn NOT IMPLEMENTED",
-        current_task().unwrap().pid.0
-    );
-    -1
+pub fn sys_spawn(path: *const u8) -> isize {
+    trace!("kernel:pid[{}] sys_spawn", current_task().unwrap().pid.0);
+    let token = current_user_token();
+    let path = translated_str(token, path);
+    if let Some(data) = get_app_data_by_name(path.as_str()) {
+        let new_task = current_task().unwrap().spawn(data);
+        let new_pid = new_task.pid.0;
+        let trap_cx = new_task.inner_exclusive_access().get_trap_cx();
+        trap_cx.x[10] = 0;
+        add_task(new_task);
+        new_pid as isize
+    } else {
+        -1
+    }
 }
 
 // YOUR JOB: Set task priority.
-pub fn sys_set_priority(_prio: isize) -> isize {
+pub fn sys_set_priority(prio: isize) -> isize {
     trace!(
-        "kernel:pid[{}] sys_set_priority NOT IMPLEMENTED",
+        "kernel:pid[{}] sys_set_priority",
         current_task().unwrap().pid.0
     );
-    -1
+    if prio >= 2 {
+        set_new_prio(prio);
+        prio
+    } else {
+        -1
+    }
 }
