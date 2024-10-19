@@ -17,6 +17,8 @@ impl File for Stdin {
     fn writable(&self) -> bool {
         false
     }
+    // 注意stdio跟磁盘无关
+    // 事实上file通过read/write的具体实现方式, 决定了最终数据最终保存的位置
     fn read(&self, mut user_buf: UserBuffer) -> usize {
         assert_eq!(user_buf.len(), 1);
         // busy loop

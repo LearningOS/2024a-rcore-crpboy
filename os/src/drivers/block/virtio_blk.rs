@@ -48,6 +48,7 @@ impl VirtIOBlock {
 pub struct VirtioHal;
 
 impl Hal for VirtioHal {
+    // 分配pages个页给当前的block设备
     fn dma_alloc(pages: usize) -> usize {
         let mut ppn_base = PhysPageNum(0);
         for i in 0..pages {
@@ -55,13 +56,16 @@ impl Hal for VirtioHal {
             if i == 0 {
                 ppn_base = frame.ppn;
             }
-            assert_eq!(frame.ppn.0, ppn_base.0 + i);
-            QUEUE_FRAMES.exclusive_access().push(frame);
+            // 按理来说这里的assert是会fail的, 但是我们只在初始化的时候调用alloc,
+            // 分配的都是连续的物理页, 因此不会发生fail
+            assert_eq!(frame.ppn.0, ppn_base.0 + i); // 保证分配的是连续的物理页
+            QUEUE_FRAMES.exclusive_access().push(frame); // 保存frame，防止提早释放
         }
         let pa: PhysAddr = ppn_base.into();
         pa.0
     }
 
+    // 从pa开始释放pages个页
     fn dma_dealloc(pa: usize, pages: usize) -> i32 {
         let pa = PhysAddr::from(pa);
         let mut ppn_base: PhysPageNum = pa.into();

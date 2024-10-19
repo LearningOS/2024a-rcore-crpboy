@@ -17,6 +17,7 @@ use lazy_static::*;
 /// inode in memory
 /// A wrapper around a filesystem inode
 /// to implement File trait atop
+/// 当前inode是内核中对于inode的封装, 携带了读写权限
 pub struct OSInode {
     readable: bool,
     writable: bool,
@@ -24,7 +25,7 @@ pub struct OSInode {
 }
 /// The OS inode inner in 'UPSafeCell'
 pub struct OSInodeInner {
-    offset: usize,
+    offset: usize, // offset维护的是进行一次读取过程时, 当前读取到的偏移量
     inode: Arc<Inode>,
 }
 
@@ -74,14 +75,19 @@ bitflags! {
     ///  The flags argument to the open() system call is constructed by ORing together zero or more of the following values:
     pub struct OpenFlags: u32 {
         /// readyonly
+        /// 只读
         const RDONLY = 0;
         /// writeonly
+        /// 只写
         const WRONLY = 1 << 0;
         /// read and write
+        /// 读写
         const RDWR = 1 << 1;
         /// create new file
+        /// 创建文件
         const CREATE = 1 << 9;
         /// truncate file size to 0
+        /// 截断文件
         const TRUNC = 1 << 10;
     }
 }
@@ -89,6 +95,7 @@ bitflags! {
 impl OpenFlags {
     /// Do not check validity for simplicity
     /// Return (readable, writable)
+    /// 返回是否可读 / 可写
     pub fn read_write(&self) -> (bool, bool) {
         if self.is_empty() {
             (true, false)

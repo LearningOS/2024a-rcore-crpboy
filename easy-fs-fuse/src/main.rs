@@ -1,3 +1,8 @@
+//! easy-fs-fuse用于进行easy-fs的打包操作
+//! 通过传入的命令行参数找到对应源文件
+//! 然后将它们按照easy-fs的磁盘格式，拷贝到磁盘镜像当中
+//! 以此创建一个可供操作系统使用的磁盘镜像
+
 use clap::{App, Arg};
 use easy_fs::{BlockDevice, EasyFileSystem};
 use std::fs::{read_dir, File, OpenOptions};

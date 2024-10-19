@@ -21,6 +21,8 @@ type DataBlock = [u8; BLOCK_SZ];
 /// An easy fs over a block device
 impl EasyFileSystem {
     /// A data block of block size
+    /// block_id布局: super_block, inode_bitmap, inode_block, data_bitmap, data_block
+    /// bitmap位于inode前面
     pub fn create(
         block_device: Arc<dyn BlockDevice>,
         total_blocks: u32,
@@ -71,8 +73,11 @@ impl EasyFileSystem {
         );
         // write back immediately
         // create a inode for root node "/"
+        // 创建根目录 '/'
         assert_eq!(efs.alloc_inode(), 0);
+        // 获得root_inode的位置
         let (root_inode_block_id, root_inode_offset) = efs.get_disk_inode_pos(0);
+        // 
         get_block_cache(root_inode_block_id as usize, Arc::clone(&block_device))
             .lock()
             .modify(root_inode_offset, |disk_inode: &mut DiskInode| {
@@ -112,6 +117,7 @@ impl EasyFileSystem {
         Inode::new(block_id, block_offset, Arc::clone(efs), block_device)
     }
     /// Get inode by id
+    /// return value: block_id, block_offset
     pub fn get_disk_inode_pos(&self, inode_id: u32) -> (u32, usize) {
         let inode_size = core::mem::size_of::<DiskInode>();
         let inodes_per_block = (BLOCK_SZ / inode_size) as u32;

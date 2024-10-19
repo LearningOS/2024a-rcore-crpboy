@@ -43,15 +43,16 @@ impl Debug for SuperBlock {
     }
 }
 
+/// superblock用于储存全局整体信息
 impl SuperBlock {
     /// Initialize a super block
     pub fn initialize(
         &mut self,
-        total_blocks: u32,
-        inode_bitmap_blocks: u32,
-        inode_area_blocks: u32,
-        data_bitmap_blocks: u32,
-        data_area_blocks: u32,
+        total_blocks: u32,        // 总块数
+        inode_bitmap_blocks: u32, // inode位图块数
+        inode_area_blocks: u32,   // inode块数
+        data_bitmap_blocks: u32,  // 数据位图block数
+        data_area_blocks: u32,    // 数据block数
     ) {
         *self = Self {
             magic: EFS_MAGIC,
@@ -63,6 +64,7 @@ impl SuperBlock {
         }
     }
     /// Check if a super block is valid using efs magic
+    /// 通过魔数判断当前数据块是否合法
     pub fn is_valid(&self) -> bool {
         self.magic == EFS_MAGIC
     }
@@ -79,13 +81,17 @@ type IndirectBlock = [u32; BLOCK_SZ / 4];
 /// A data block
 type DataBlock = [u8; BLOCK_SZ];
 /// A disk inode
+/// 用于进行数据块的寻址, 并保存文件的数据
+/// inode是存储在inode block内的单元, 每个inode block存储多个inode
+/// 一级 二级索引跟inode块是不同的，它们只为单一文件服务
+/// 一级 二级索引用于进行大/超大文件的索引
 #[repr(C)]
 pub struct DiskInode {
-    pub size: u32,
-    pub direct: [u32; INODE_DIRECT_COUNT],
-    pub indirect1: u32,
-    pub indirect2: u32,
-    type_: DiskInodeType,
+    pub size: u32,                         // 这里的size是byte个数
+    pub direct: [u32; INODE_DIRECT_COUNT], // 直接指向数据块
+    pub indirect1: u32,                    // 一级索引块的指针, 保存数据块的指针
+    pub indirect2: u32,                    // 二级索引块的指针, 保存一级索引块的指针
+    type_: DiskInodeType,                  // file or dict
 }
 
 impl DiskInode {
@@ -108,13 +114,15 @@ impl DiskInode {
         self.type_ == DiskInodeType::File
     }
     /// Return block number correspond to size.
+    /// 返回的是需要映射到的**数据块**的个数
     pub fn data_blocks(&self) -> u32 {
         Self::_data_blocks(self.size)
     }
     fn _data_blocks(size: u32) -> u32 {
-        (size + BLOCK_SZ as u32 - 1) / BLOCK_SZ as u32
+        (size + BLOCK_SZ as u32 - 1) / BLOCK_SZ as u32 // ceil(size / block_sz)
     }
     /// Return number of blocks needed include indirect1/2.
+    /// 返回的是保存整个文件需要的总块数, 包括了一二级索引
     pub fn total_blocks(size: u32) -> u32 {
         let data_blocks = Self::_data_blocks(size) as usize;
         let mut total = data_blocks as usize;
@@ -137,6 +145,7 @@ impl DiskInode {
         Self::total_blocks(new_size) - Self::total_blocks(self.size)
     }
     /// Get id of block given inner id
+    /// 给定inode内的id, 获取数据块id
     pub fn get_block_id(&self, inner_id: u32, block_device: &Arc<dyn BlockDevice>) -> u32 {
         let inner_id = inner_id as usize;
         if inner_id < INODE_DIRECT_COUNT {
@@ -148,12 +157,15 @@ impl DiskInode {
                     indirect_block[inner_id - INODE_DIRECT_COUNT]
                 })
         } else {
-            let last = inner_id - INDIRECT1_BOUND;
+            let last = inner_id - INDIRECT1_BOUND; // 除了直接索引+一级索引, 剩下的数据都存在二级索引里, 这里作差求出二级索引里的数据个数
+                                                   // 从二级索引块的数据中读出一级索引的指针
+                                                   // 这个闭包的意思是: 读出的数据以索引块的形式传入, 并获取它的last / INODE_INDIRECT1_COUNT位置以找到对应一级索引的值
             let indirect1 = get_block_cache(self.indirect2 as usize, Arc::clone(block_device))
                 .lock()
                 .read(0, |indirect2: &IndirectBlock| {
                     indirect2[last / INODE_INDIRECT1_COUNT]
                 });
+            // 然后再通过一级索引读出数据块指针, 注意, 这里的一级索引是二级索引块内保存的索引指针, 而不是self.indirect1
             get_block_cache(indirect1 as usize, Arc::clone(block_device))
                 .lock()
                 .read(0, |indirect1: &IndirectBlock| {
@@ -162,6 +174,9 @@ impl DiskInode {
         }
     }
     /// Inncrease the size of current disk inode
+    /// 对于当前inode进行扩容
+    /// 扩展为new_size
+    /// new_blocks是允许保存数据的blocks, indirect和data都通过此保存
     pub fn increase_size(
         &mut self,
         new_size: u32,
@@ -179,6 +194,7 @@ impl DiskInode {
         }
         // alloc indirect1
         if total_blocks > INODE_DIRECT_COUNT as u32 {
+            // 发现是超出direct导致的break, 则开始分配indirect1
             if current_blocks == INODE_DIRECT_COUNT as u32 {
                 self.indirect1 = new_blocks.next().unwrap();
             }
@@ -198,6 +214,7 @@ impl DiskInode {
             });
         // alloc indirect2
         if total_blocks > INODE_INDIRECT1_COUNT as u32 {
+            // 发现是超出indirect1导致的break, 则开始分配indirect2
             if current_blocks == INODE_INDIRECT1_COUNT as u32 {
                 self.indirect2 = new_blocks.next().unwrap();
             }
