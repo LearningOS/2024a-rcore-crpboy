@@ -18,4 +18,4 @@ pushall.sh
 
 user/
 ci-user/
-# tmp/
+tmp/

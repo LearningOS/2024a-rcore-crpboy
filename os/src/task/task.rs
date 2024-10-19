@@ -1,6 +1,6 @@
 //! Types related to task management & Functions for completely changing TCB
 use super::stride::StrideBlock;
-use super::TaskContext;
+use super::{current_task, TaskContext};
 use super::{kstack_alloc, pid_alloc, KernelStack, PidHandle};
 use crate::config::{MAX_SYSCALL_NUM, TRAP_CONTEXT_BASE};
 use crate::fs::{File, Stdin, Stdout};
@@ -326,6 +326,15 @@ impl TaskControlBlock {
             None
         }
     }
+}
+
+/// set a new priority for task
+pub fn set_new_prio(new_prio: isize) {
+    current_task()
+        .unwrap()
+        .inner_exclusive_access()
+        .stride_block
+        .set_new_prio(new_prio);
 }
 
 #[derive(Copy, Clone, PartialEq)]
