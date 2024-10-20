@@ -93,6 +93,7 @@ pub struct DiskInode {
     pub direct: [u32; INODE_DIRECT_COUNT], // 直接指向数据块
     pub indirect1: u32,                    // 一级索引块的指针, 保存数据块的指针
     pub indirect2: u32,                    // 二级索引块的指针, 保存一级索引块的指针
+    pub link_count: u32,                   // link count
     type_: DiskInodeType,                  // file or dict
 }
 
@@ -104,6 +105,7 @@ impl DiskInode {
         self.direct.iter_mut().for_each(|v| *v = 0);
         self.indirect1 = 0;
         self.indirect2 = 0;
+        self.link_count = 1;
         self.type_ = type_;
     }
     /// Whether this inode is a directory
@@ -409,6 +411,21 @@ impl DiskInode {
     /// get type
     pub fn get_type(&self) -> DiskInodeType {
         self.type_
+    }
+    /// get nlink
+    pub fn get_nlink(&self) -> usize {
+        self.link_count as usize
+    }
+    /// link count inc
+    pub fn link_count_inc(&mut self) {
+        assert!(self.is_file());
+        self.link_count += 1;
+    }
+    /// link count dec
+    pub fn link_count_dec(&mut self) {
+        assert!(self.is_file());
+        assert!(self.link_count > 0);
+        self.link_count -= 1;
     }
 }
 /// A directory entry

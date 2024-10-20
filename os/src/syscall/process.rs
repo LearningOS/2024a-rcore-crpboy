@@ -158,7 +158,6 @@ pub fn sys_task_info(ti: *mut TaskInfo) -> isize {
         current_task().unwrap().pid.0
     );
     let res = get_task_info();
-    // info!("task_req: {:?}\nday: {:?}", res, res.syscall_times[169]);
     copy_from_kernel_space(ti, &res);
     0
 }
@@ -182,7 +181,6 @@ pub fn sys_mmap(start: usize, len: usize, _port: usize) -> isize {
     }
     // insert page map
     let perm = MapPermission::from_bits_truncate((_port << 1) as u8) | MapPermission::U;
-    // info!("{:?} {:?}", _port, perm);
     if !do_mmap(start, len, perm) {
         return -1;
     }

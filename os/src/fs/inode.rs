@@ -4,7 +4,7 @@
 //!
 //! `UPSafeCell<OSInodeInner>` -> `OSInode`: for static `ROOT_INODE`,we
 //! need to wrap `OSInodeInner` into `UPSafeCell`
-use super::{File, StatMode};
+use super::{File, Stat, StatMode};
 use crate::drivers::BLOCK_DEVICE;
 use crate::mm::UserBuffer;
 use crate::sync::UPSafeCell;
@@ -52,6 +52,13 @@ impl OSInode {
             v.extend_from_slice(&buffer[..len]);
         }
         v
+    }
+    /// create a new link with another name
+    pub fn linkat(&self, old_name: &str, new_name: &str) {
+        self.inner
+            .exclusive_access()
+            .inode
+            .linkat(old_name, new_name);
     }
 }
 
@@ -122,13 +129,27 @@ pub fn open_file(name: &str, flags: OpenFlags) -> Option<Arc<OSInode>> {
                 .map(|inode| Arc::new(OSInode::new(readable, writable, inode)))
         }
     } else {
-        ROOT_INODE.find(name).map(|inode| {
+        let res = ROOT_INODE.find(name);
+        if res.is_none() {
+            info!("res is none!!!");
+        }
+        res.map(|inode| {
             if flags.contains(OpenFlags::TRUNC) {
                 inode.clear();
             }
             Arc::new(OSInode::new(readable, writable, inode))
         })
     }
+}
+
+/// link old name at new name
+pub fn linkat(old_name: &str, new_name: &str) -> Option<()> {
+    ROOT_INODE.linkat(old_name, new_name)
+}
+
+/// unlink a file
+pub fn unlinkat(name: &str) -> Option<()> {
+    ROOT_INODE.unlinkat(name)
 }
 
 impl File for OSInode {
@@ -162,15 +183,17 @@ impl File for OSInode {
         }
         total_write_size
     }
-    fn stat(&self) -> super::Stat {
+    fn stat(&self) -> Stat {
         let inner = self.inner.exclusive_access();
         let mode = match_type_to_stat_mode(inner.inode.get_type());
-        let ino = inner.inode.get_inode_id() as u64;
-        super::Stat {
+        let inode_id = inner.inode.get_inode_id();
+        let nlink = inner.inode.get_nlink();
+        info!("inode_id: {}, nlink: {}", inode_id, nlink);
+        Stat {
             dev: 0,
-            ino,
+            ino: inode_id as u64,
             mode,
-            nlink: 1,
+            nlink: nlink as u32,
             pad: [0; 7],
         }
     }

@@ -1,5 +1,5 @@
 //! File and filesystem-related syscalls
-use crate::fs::{open_file, OpenFlags, Stat};
+use crate::fs::{linkat, open_file, unlinkat, OpenFlags, Stat};
 use crate::mm::{translated_byte_buffer, translated_str, UserBuffer};
 use crate::syscall::copy_from_kernel_space;
 use crate::task::{current_task, current_user_token};
@@ -48,7 +48,7 @@ pub fn sys_read(fd: usize, buf: *const u8, len: usize) -> isize {
 }
 
 pub fn sys_open(path: *const u8, flags: u32) -> isize {
-    trace!("kernel:pid[{}] sys_open", current_task().unwrap().pid.0);
+    info!("kernel:pid[{}] sys_open", current_task().unwrap().pid.0);
     let task = current_task().unwrap();
     let token = current_user_token();
     let path = translated_str(token, path);
@@ -83,8 +83,10 @@ pub fn sys_fstat(fd: usize, st: *mut Stat) -> isize {
     let inner = task.inner_exclusive_access();
     let file = inner.fd_table[fd].clone();
     drop(inner);
+    info!("fd: {}, st: {:?}", fd, st);
     if let Some(inode) = file {
         let stat = inode.stat();
+        info!("{:?}", stat);
         copy_from_kernel_space(st, &stat);
         0
     } else {
@@ -93,13 +95,27 @@ pub fn sys_fstat(fd: usize, st: *mut Stat) -> isize {
 }
 
 /// YOUR JOB: Implement linkat.
-pub fn sys_linkat(_old_name: *const u8, _new_name: *const u8) -> isize {
+pub fn sys_linkat(old_name: *const u8, new_name: *const u8) -> isize {
     trace!("kernel:pid[{}] sys_linkat", current_task().unwrap().pid.0);
-    0
+    if old_name == new_name {
+        return -1;
+    }
+    let token = current_user_token();
+    let old_name_str = translated_str(token, old_name);
+    let new_name_str = translated_str(token, new_name);
+    match linkat(old_name_str.as_str(), new_name_str.as_str()) {
+        Some(_) => 0,
+        None => -1,
+    }
 }
 
 /// YOUR JOB: Implement unlinkat.
-pub fn sys_unlinkat(_name: *const u8) -> isize {
+pub fn sys_unlinkat(name: *const u8) -> isize {
     trace!("kernel:pid[{}] sys_unlinkat", current_task().unwrap().pid.0);
-    0
+    let token = current_user_token();
+    let name_str = translated_str(token, name);
+    match unlinkat(name_str.as_str()) {
+        Some(_) => 0,
+        None => -1,
+    }
 }
