@@ -1,0 +1,16 @@
+{
+    "folders": [
+        {
+            "path": "./os/"
+        },
+        {
+            "path": "./easy-fs/"
+        },
+        {
+            "path": "./easy-fs-fuse/"
+        },
+        {
+            "path": "."
+        }
+    ]
+}
