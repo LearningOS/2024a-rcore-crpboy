@@ -247,14 +247,11 @@ pub fn sys_semaphore_down(sem_id: usize) -> isize {
         return DEADLOCK_IDENTIFIER;
     }
     drop(process_inner);
-    current_task().unwrap().inner_exclusive_access()
-        .res.as_mut().unwrap().hang_sem_id = sem_id;
-    if sem.down() {
-        current_process()
-            .inner_exclusive_access()
-            .semaphore_deadlock_detector
-            .alloc(tid, sem_id, 1);
-    }
+    sem.down();
+    current_process()
+        .inner_exclusive_access()
+        .semaphore_deadlock_detector
+        .alloc(tid, sem_id, 1);
     0
 }
 /// condvar create syscall

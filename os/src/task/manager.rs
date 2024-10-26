@@ -74,11 +74,6 @@ pub fn wakeup_task(task: Arc<TaskControlBlock>) {
     task_inner.task_status = TaskStatus::Ready;
     drop(task_inner);
     let tid = task.inner_exclusive_access().res.as_ref().unwrap().tid;
-    let sem_id = task.inner_exclusive_access().res.as_ref().unwrap().hang_sem_id;
-    task.process.upgrade().unwrap()
-        .inner_exclusive_access()
-        .semaphore_deadlock_detector
-        .alloc(tid, sem_id, 1);
     add_task(task);
 }
 

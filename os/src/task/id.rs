@@ -132,8 +132,6 @@ pub struct TaskUserRes {
     pub tid: usize,
     /// user stack base
     pub ustack_base: usize,
-    /// waiting sem_id
-    pub hang_sem_id: usize,
     /// process belongs to
     pub process: Weak<ProcessControlBlock>,
 }
@@ -159,7 +157,6 @@ impl TaskUserRes {
             tid,
             ustack_base,
             process: Arc::downgrade(&process),
-            hang_sem_id: 0,
         };
         if alloc_user_res {
             task_user_res.alloc_user_res();

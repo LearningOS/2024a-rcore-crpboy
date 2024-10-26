@@ -179,7 +179,7 @@ impl DeadlockDetector {
                 return true;
             }
         }
-        return false;
+        false
     }
 
     /// lock resource but not alloc
