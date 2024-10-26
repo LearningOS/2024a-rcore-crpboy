@@ -43,6 +43,10 @@ pub use task::{TaskControlBlock, TaskStatus};
 pub fn suspend_current_and_run_next() {
     // There must be an application running.
     let task = take_current_task().unwrap();
+    info!(
+        "kernel: pid[{}] suspend_current_and_run_next",
+        task.process.upgrade().unwrap().getpid()
+    );
 
     // ---- access current TCB exclusively
     let mut task_inner = task.inner_exclusive_access();

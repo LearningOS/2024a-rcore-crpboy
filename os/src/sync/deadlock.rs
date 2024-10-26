@@ -49,6 +49,7 @@ impl DeadlockDetector {
 
     /// enable impl
     pub fn enable(&mut self) {
+        info!("deadlock detector enabled");
         self.enabled = true;
     }
     pub fn disable(&mut self) {
@@ -65,10 +66,11 @@ impl DeadlockDetector {
         }
 
         info!(
-            "create resource: {} {}",
+            "create resource: rid[{}] num[{}]",
             self.available_resources.len(),
-            res_count
+            res_count,
         );
+        info!("before: {:?}", self);
 
         self.available_resources.push(res_count);
         for it in self.task_allocation.iter_mut() {
@@ -77,12 +79,15 @@ impl DeadlockDetector {
         for it in self.task_need.iter_mut() {
             it.push(0);
         }
+
+        info!("after: {:?}", self);
     }
     pub fn rebase_resource(&mut self, id: usize, res_count: usize) {
         if !self.is_enable() {
             return;
         }
-        info!("create resource: {} {}", id, res_count);
+        info!("rebase resource: rid[{}] num[{}]", id, res_count);
+        info!("before: {:?}", self);
         assert!(id < self.resource_len());
         self.available_resources[id] = res_count;
         for it in self.task_allocation.iter_mut() {
@@ -91,12 +96,14 @@ impl DeadlockDetector {
         for it in self.task_need.iter_mut() {
             it[id] = 0;
         }
+        info!("after: {:?}", self);
     }
     pub fn create_task(&mut self, tid: usize) {
         if !self.is_enable() {
             return;
         }
-        info!("create task: {}", tid);
+        info!("create task: tid[{}]", tid);
+        info!("before: {:?}", self);
         if tid >= self.task_len() {
             self.task_allocation.push(vec![0; self.resource_len()]);
             self.task_need.push(vec![0; self.resource_len()]);
@@ -105,6 +112,7 @@ impl DeadlockDetector {
             self.task_allocation[tid] = vec![0; self.resource_len()];
             self.task_need[tid] = vec![0; self.resource_len()];
         }
+        info!("after: {:?}", self);
     }
 
     /// alloc resource
@@ -112,13 +120,15 @@ impl DeadlockDetector {
         if !self.is_enable() {
             return;
         }
-        info!("alloc: {} {} {}\nself: {:?}", tid, rid, num, self);
+        info!("alloc: tid[{}] rid[{}] num[{}]", tid, rid, num);
+        info!("before: {:?}", self);
         assert!(tid < self.task_len());
         assert!(rid < self.resource_len());
         assert!(self.available_resources[rid] >= num);
         self.available_resources[rid] -= num;
         self.task_allocation[tid][rid] += num;
         self.task_need[tid][rid] -= num;
+        info!("after: {:?}", self);
     }
 
     /// dealloc resource
@@ -126,12 +136,14 @@ impl DeadlockDetector {
         if !self.is_enable() {
             return;
         }
-        info!("dealloc: {} {} {}\n{:?}", tid, rid, num, self);
+        info!("dealloc: tid[{}] rid[{}] num[{}]", tid, rid, num);
+        info!("before: {:?}", self);
         assert!(tid < self.task_len());
         assert!(rid < self.resource_len());
         self.available_resources[rid] += num;
         self.task_allocation[tid][rid] -= num;
         self.task_need[tid][rid] += num;
+        info!("after: {:?}", self);
     }
 
     /// returns true when detect deadlock
@@ -139,14 +151,16 @@ impl DeadlockDetector {
         if !self.is_enable() {
             return false;
         }
-        info!("deadlock check: {:?}", self);
+        info!("deadlock check: self[{:?}]", self);
         let mut work = self.available_resources.clone();
         let mut finish = vec![false; self.task_len()];
         loop {
             let mut flag = false;
+            info!("doing check: finish[{:?}], work[{:?}]", finish, work);
             for i in 0..self.task_len() {
                 for j in 0..self.resource_len() {
                     if !finish[i] && self.task_need[i][j] <= work[j] {
+                        info!("task[{}] can finish with allocation[{}]", i, j);
                         work[j] += self.task_allocation[i][j];
                         finish[i] = true;
                         flag = true;
@@ -172,10 +186,14 @@ impl DeadlockDetector {
         if !self.is_enable() {
             return true;
         }
-        info!("try_request: {} {} {}", tid, rid, num);
+        info!("try_request: tid[{}] rid[{}] num[{}]", tid, rid, num);
         assert!(tid < self.task_len());
         assert!(rid < self.resource_len());
         self.task_need[tid][rid] += num;
-        !self.is_deadlock()
+        let res = self.is_deadlock();
+        if res {
+            info!("DEADLOCK DETECTED!!!\n{:?}\n", self);
+        }
+        !res
     }
 }
