@@ -3,7 +3,7 @@
 //! It is only used to manage processes and schedule process based on ready queue.
 //! Other CPU process monitoring functions are in Processor.
 
-use super::{ProcessControlBlock, TaskControlBlock, TaskStatus};
+use super::{current_process, ProcessControlBlock, TaskControlBlock, TaskStatus};
 use crate::sync::UPSafeCell;
 use alloc::collections::{BTreeMap, VecDeque};
 use alloc::sync::Arc;
@@ -11,7 +11,7 @@ use lazy_static::*;
 ///A array of `TaskControlBlock` that is thread-safe
 pub struct TaskManager {
     ready_queue: VecDeque<Arc<TaskControlBlock>>,
-    
+
     /// The stopping task, leave a reference so that the kernel stack will not be recycled when switching tasks
     stop_task: Option<Arc<TaskControlBlock>>,
 }
@@ -50,7 +50,6 @@ impl TaskManager {
         // case) so that we can simply replace it;
         self.stop_task = Some(task);
     }
-
 }
 
 lazy_static! {
@@ -74,6 +73,12 @@ pub fn wakeup_task(task: Arc<TaskControlBlock>) {
     let mut task_inner = task.inner_exclusive_access();
     task_inner.task_status = TaskStatus::Ready;
     drop(task_inner);
+    let tid = task.inner_exclusive_access().res.as_ref().unwrap().tid;
+    let sem_id = task.inner_exclusive_access().res.as_ref().unwrap().hang_sem_id;
+    task.process.upgrade().unwrap()
+        .inner_exclusive_access()
+        .semaphore_deadlock_detector
+        .alloc(tid, sem_id, 1);
     add_task(task);
 }
 

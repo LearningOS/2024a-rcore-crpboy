@@ -142,7 +142,7 @@ impl DeadlockDetector {
         assert!(rid < self.resource_len());
         self.available_resources[rid] += num;
         self.task_allocation[tid][rid] -= num;
-        self.task_need[tid][rid] += num;
+        // self.task_need[tid][rid] += num;
         info!("after: {:?}", self);
     }
 
@@ -158,13 +158,15 @@ impl DeadlockDetector {
             let mut flag = false;
             info!("doing check: finish[{:?}], work[{:?}]", finish, work);
             for i in 0..self.task_len() {
-                for j in 0..self.resource_len() {
-                    if !finish[i] && self.task_need[i][j] <= work[j] {
+                if !finish[i] && self.available_resources.iter().enumerate()
+                    .all(|(j, number)| self.task_need[i][j] <= work[j]) {
+                    flag = true;
+                    finish[i] = true;
+                    for j in 0..self.resource_len() {
                         info!("task[{}] can finish with allocation[{}]", i, j);
                         work[j] += self.task_allocation[i][j];
-                        finish[i] = true;
-                        flag = true;
                     }
+                    break;
                 }
             }
             if !flag {

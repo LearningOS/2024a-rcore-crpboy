@@ -7,7 +7,7 @@ use alloc::sync::Arc;
 
 /// if sys_enable_deadlock_detect is called
 /// then mutex operation should return this value if it detect deadlock
-const DEADLOCK_IDENTIFIER: isize = -0xDEAD;
+const DEADLOCK_IDENTIFIER: isize = -0xdead;
 
 /// sleep syscall
 pub fn sys_sleep(ms: usize) -> isize {
@@ -140,7 +140,9 @@ pub fn sys_mutex_unlock(mutex_id: usize) -> isize {
 /// semaphore create syscall
 /// 创建信号量资源
 pub fn sys_semaphore_create(res_count: usize) -> isize {
-    trace!(
+    let pid = current_process().pid.0;
+    if pid == 15 {
+        info!(
         "kernel:pid[{}] tid[{}] sys_semaphore_create",
         current_task().unwrap().process.upgrade().unwrap().getpid(),
         current_task()
@@ -150,7 +152,8 @@ pub fn sys_semaphore_create(res_count: usize) -> isize {
             .as_ref()
             .unwrap()
             .tid
-    );
+        );
+    }
     let process = current_process();
     let mut process_inner = process.inner_exclusive_access();
     let id = if let Some(id) = process_inner
@@ -178,17 +181,20 @@ pub fn sys_semaphore_create(res_count: usize) -> isize {
 }
 /// semaphore up syscall
 pub fn sys_semaphore_up(sem_id: usize) -> isize {
-    trace!(
-        "kernel:pid[{}] tid[{}] sys_semaphore_up",
-        current_task().unwrap().process.upgrade().unwrap().getpid(),
-        current_task()
-            .unwrap()
-            .inner_exclusive_access()
-            .res
-            .as_ref()
-            .unwrap()
-            .tid
-    );
+    let pid = current_process().pid.0;
+    if pid == 15 {
+        info!(
+            "kernel:pid[{}] tid[{}] sys_semaphore_up",
+            current_task().unwrap().process.upgrade().unwrap().getpid(),
+            current_task()
+                .unwrap()
+                .inner_exclusive_access()
+                .res
+                .as_ref()
+                .unwrap()
+                .tid
+        );
+    }
     let process = current_process();
     let process_inner = process.inner_exclusive_access();
     let sem = Arc::clone(process_inner.semaphore_list[sem_id].as_ref().unwrap());
@@ -209,18 +215,21 @@ pub fn sys_semaphore_up(sem_id: usize) -> isize {
 }
 /// semaphore down syscall
 pub fn sys_semaphore_down(sem_id: usize) -> isize {
-    trace!(
-        "kernel:pid[{}] tid[{}] sys_semaphore_down",
-        current_task().unwrap().process.upgrade().unwrap().getpid(),
-        current_task()
-            .unwrap()
-            .inner_exclusive_access()
-            .res
-            .as_ref()
-            .unwrap()
-            .tid
-    );
-    let mut ret_value = 0;
+    let pid = current_process().pid.0;
+    if pid == 15 {
+        info!(
+            "kernel:pid[{}] tid[{}] sys_semaphore_down",
+            current_task().unwrap().process.upgrade().unwrap().getpid(),
+            current_task()
+                .unwrap()
+                .inner_exclusive_access()
+                .res
+                .as_ref()
+                .unwrap()
+                .tid
+        );
+    }
+    // let mut ret_value = 0;
     let process = current_process();
     let mut process_inner = process.inner_exclusive_access();
     let sem = Arc::clone(process_inner.semaphore_list[sem_id].as_ref().unwrap());
@@ -235,15 +244,18 @@ pub fn sys_semaphore_down(sem_id: usize) -> isize {
         .semaphore_deadlock_detector
         .try_request(tid, sem_id, 1)
     {
-        ret_value = DEADLOCK_IDENTIFIER;
+        return DEADLOCK_IDENTIFIER;
     }
     drop(process_inner);
-    sem.down();
-    current_process()
-        .inner_exclusive_access()
-        .semaphore_deadlock_detector
-        .alloc(tid, sem_id, 1);
-    ret_value
+    current_task().unwrap().inner_exclusive_access()
+        .res.as_mut().unwrap().hang_sem_id = sem_id;
+    if sem.down() {
+        current_process()
+            .inner_exclusive_access()
+            .semaphore_deadlock_detector
+            .alloc(tid, sem_id, 1);
+    }
+    0
 }
 /// condvar create syscall
 pub fn sys_condvar_create() -> isize {
@@ -340,8 +352,8 @@ pub fn sys_enable_deadlock_detect(is_enabled: usize) -> isize {
             0
         }
         1 => {
-            // process_inner.mutex_deadlock_detector.enable();
-            // process_inner.semaphore_deadlock_detector.enable();
+            process_inner.mutex_deadlock_detector.enable();
+            process_inner.semaphore_deadlock_detector.enable();
             0
         }
         _ => -1,

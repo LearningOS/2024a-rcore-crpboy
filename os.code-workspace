@@ -10,7 +10,10 @@
             "path": "./easy-fs-fuse/"
         },
         {
-            "path": "ci-user/user"
+            "path": ".tmp"
+        },
+        {
+            "path": "report"
         }
     ]
 }
