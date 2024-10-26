@@ -10,7 +10,7 @@
             "path": "./easy-fs-fuse/"
         },
         {
-            "path": "."
+            "path": "ci-user/user"
         }
     ]
 }

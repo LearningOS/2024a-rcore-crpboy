@@ -7,6 +7,12 @@ use crate::{mm::PhysPageNum, sync::UPSafeCell};
 use alloc::sync::{Arc, Weak};
 use core::cell::RefMut;
 
+/*
+    这里的task就是thread的意思
+    线程由进程进行创建
+    除了内核栈和用户栈之外就不会进行较大空间的分配了
+*/
+
 /// Task control block structure
 pub struct TaskControlBlock {
     /// immutable

@@ -140,6 +140,7 @@ fn trap_cx_bottom_from_tid(tid: usize) -> usize {
     TRAP_CONTEXT_BASE - tid * PAGE_SIZE
 }
 /// Return the bottom addr (high addr) of the user stack for a task
+/// 加入了tid, 也就是说我们会按照线程数, 依次进行user_stack_size的分配
 fn ustack_bottom_from_tid(ustack_base: usize, tid: usize) -> usize {
     ustack_base + tid * (PAGE_SIZE + USER_STACK_SIZE)
 }
@@ -163,6 +164,7 @@ impl TaskUserRes {
         task_user_res
     }
     /// Allocate user resource for a task
+    /// 好家伙, 用户栈是在这里分配的, 藏的够深啊
     pub fn alloc_user_res(&self) {
         let process = self.process.upgrade().unwrap();
         let mut process_inner = process.inner_exclusive_access();
