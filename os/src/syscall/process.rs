@@ -1,11 +1,12 @@
 use crate::{
     config::MAX_SYSCALL_NUM,
     fs::{open_file, OpenFlags},
-    mm::{translated_ref, translated_refmut, translated_str},
+    mm::{translated_byte_buffer, translated_ref, translated_refmut, translated_str},
     task::{
         current_process, current_task, current_user_token, exit_current_and_run_next, pid2process,
         suspend_current_and_run_next, SignalFlags, TaskStatus,
     },
+    timer::get_time_us,
 };
 use alloc::{string::String, sync::Arc, vec::Vec};
 
@@ -157,17 +158,36 @@ pub fn sys_kill(pid: usize, signal: u32) -> isize {
     }
 }
 
-/// get_time syscall
-///
+pub fn copy_from_kernel_space<T>(tar_ptr: *mut T, res: &T) {
+    let tar = translated_byte_buffer(
+        current_user_token(),
+        tar_ptr as *const u8,
+        core::mem::size_of::<T>(),
+    );
+    let mut res_ptr = res as *const T;
+    for dst in tar.into_iter() {
+        unsafe {
+            dst.copy_from_slice(core::slice::from_raw_parts(res_ptr as *const u8, dst.len()));
+            res_ptr = res_ptr.add(dst.len());
+        }
+    }
+}
+
 /// YOUR JOB: get time with second and microsecond
 /// HINT: You might reimplement it with virtual memory management.
 /// HINT: What if [`TimeVal`] is splitted by two pages ?
-pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
+pub fn sys_get_time(ts: *mut TimeVal, _tz: usize) -> isize {
     trace!(
-        "kernel:pid[{}] sys_get_time NOT IMPLEMENTED",
+        "kernel:pid[{}] sys_get_time",
         current_task().unwrap().process.upgrade().unwrap().getpid()
     );
-    -1
+    let time_us = get_time_us();
+    let res = TimeVal {
+        sec: time_us / 1_000_000,
+        usec: time_us % 1_000_000,
+    };
+    copy_from_kernel_space(ts, &res);
+    0
 }
 
 /// task_info syscall
